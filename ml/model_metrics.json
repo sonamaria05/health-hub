@@ -1,0 +1,146 @@
+{
+  "model_version": "ensemble-tabular-v2",
+  "dataset": {
+    "seed_rows": 500,
+    "train_rows": 375,
+    "test_rows": 125,
+    "test_ratio": 0.25,
+    "augmentation_factor": 4,
+    "seed": 42
+  },
+  "per_model": {
+    "anemia": {
+      "selected_model": "random_forest",
+      "cross_validation": {
+        "logistic_regression": {
+          "threshold": 0.45,
+          "cv_f1": 0.7395,
+          "cv_auc": 0.8178
+        },
+        "random_forest": {
+          "threshold": 0.5,
+          "cv_f1": 0.8274,
+          "cv_auc": 0.8935
+        }
+      },
+      "test_metrics": {
+        "sample_count": 125,
+        "positive_count": 62,
+        "negative_count": 63,
+        "accuracy": 0.808,
+        "precision": 0.8654,
+        "recall": 0.7258,
+        "f1": 0.7895,
+        "auc": 0.8838,
+        "threshold": 0.5,
+        "confusion_matrix": {
+          "tp": 45,
+          "fp": 7,
+          "tn": 56,
+          "fn": 17
+        }
+      }
+    },
+    "diabetes": {
+      "selected_model": "random_forest",
+      "cross_validation": {
+        "logistic_regression": {
+          "threshold": 0.35,
+          "cv_f1": 0.6395,
+          "cv_auc": 0.801
+        },
+        "random_forest": {
+          "threshold": 0.425,
+          "cv_f1": 0.8071,
+          "cv_auc": 0.9424
+        }
+      },
+      "test_metrics": {
+        "sample_count": 125,
+        "positive_count": 44,
+        "negative_count": 81,
+        "accuracy": 0.864,
+        "precision": 0.7455,
+        "recall": 0.9318,
+        "f1": 0.8283,
+        "auc": 0.9753,
+        "threshold": 0.425,
+        "confusion_matrix": {
+          "tp": 41,
+          "fp": 14,
+          "tn": 67,
+          "fn": 3
+        }
+      }
+    },
+    "cardiovascular": {
+      "selected_model": "random_forest",
+      "cross_validation": {
+        "logistic_regression": {
+          "threshold": 0.25,
+          "cv_f1": 0.8827,
+          "cv_auc": 0.8464
+        },
+        "random_forest": {
+          "threshold": 0.4,
+          "cv_f1": 0.9256,
+          "cv_auc": 0.9205
+        }
+      },
+      "test_metrics": {
+        "sample_count": 125,
+        "positive_count": 102,
+        "negative_count": 23,
+        "accuracy": 0.912,
+        "precision": 0.9174,
+        "recall": 0.9804,
+        "f1": 0.9479,
+        "auc": 0.971,
+        "threshold": 0.4,
+        "confusion_matrix": {
+          "tp": 100,
+          "fp": 9,
+          "tn": 14,
+          "fn": 2
+        }
+      }
+    },
+    "kidney": {
+      "selected_model": "random_forest",
+      "cross_validation": {
+        "logistic_regression": {
+          "threshold": 0.4,
+          "cv_f1": 0.8497,
+          "cv_auc": 0.926
+        },
+        "random_forest": {
+          "threshold": 0.45,
+          "cv_f1": 0.9164,
+          "cv_auc": 0.9648
+        }
+      },
+      "test_metrics": {
+        "sample_count": 125,
+        "positive_count": 54,
+        "negative_count": 71,
+        "accuracy": 0.88,
+        "precision": 0.8545,
+        "recall": 0.8704,
+        "f1": 0.8624,
+        "auc": 0.9288,
+        "threshold": 0.45,
+        "confusion_matrix": {
+          "tp": 47,
+          "fp": 8,
+          "tn": 63,
+          "fn": 7
+        }
+      }
+    }
+  },
+  "summary": {
+    "average_accuracy": 0.866,
+    "average_f1": 0.857,
+    "average_auc": 0.9397
+  }
+}

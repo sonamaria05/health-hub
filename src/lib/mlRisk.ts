@@ -1,0 +1,243 @@
+import { mlArtifacts } from './generated/mlArtifacts';
+
+export type RiskLevel = 'low' | 'moderate' | 'high';
+
+export interface ExtractedMetric {
+  value: number;
+  unit: string;
+  normalRange: string;
+  status: 'normal' | 'high' | 'low';
+}
+
+export interface RecordLike {
+  date?: string;
+  extractedData?: Record<string, ExtractedMetric>;
+}
+
+export interface FeatureSnapshot {
+  hemoglobin: number;
+  fasting_glucose: number;
+  total_cholesterol: number;
+  creatinine: number;
+  hba1c: number;
+  ldl_cholesterol: number;
+  triglycerides: number;
+  abnormal_ratio: number;
+  record_count: number;
+  anemia_signal: number;
+  glycemic_signal: number;
+  lipid_signal: number;
+  kidney_signal: number;
+  risk_burden: number;
+  glucose_hba1c_interaction: number;
+  lipid_density: number;
+  renal_load: number;
+}
+
+export interface HealthRiskPrediction {
+  condition: string;
+  risk: RiskLevel;
+  probability: number;
+  factors: string[];
+  recommendation: string;
+  method: 'trained_model';
+  modelVersion: string;
+}
+
+type FeatureKey = keyof FeatureSnapshot;
+type ModelKey = keyof typeof mlArtifacts.models;
+type ModelArtifact = (typeof mlArtifacts.models)[ModelKey];
+
+const MODEL_VERSION = mlArtifacts.model_version;
+const featureDefinitions = mlArtifacts.feature_definitions;
+const modelArtifacts = mlArtifacts.models;
+const allFeatures = mlArtifacts.all_features as unknown as readonly FeatureKey[];
+
+function sigmoid(value: number) {
+  return 1 / (1 + Math.exp(-value));
+}
+
+function toRiskLevel(probability: number, threshold: number): RiskLevel {
+  const highThreshold = Math.min(Math.max(threshold + 0.2, 0.72), 0.9);
+  if (probability >= highThreshold) return 'high';
+  if (probability >= threshold) return 'moderate';
+  return 'low';
+}
+
+function getLatestMetricValue(records: RecordLike[], aliases: readonly string[]) {
+  const sortedRecords = [...records].sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
+
+  for (let index = sortedRecords.length - 1; index >= 0; index -= 1) {
+    const extractedData = sortedRecords[index].extractedData ?? {};
+    for (const alias of aliases) {
+      const metric = extractedData[alias];
+      if (metric?.value != null) {
+        return metric.value;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function deriveEngineeredFeatures(base: Omit<FeatureSnapshot, 'anemia_signal' | 'glycemic_signal' | 'lipid_signal' | 'kidney_signal' | 'risk_burden' | 'glucose_hba1c_interaction' | 'lipid_density' | 'renal_load'>) {
+  const anemiaSignal = Math.max(0, 12 - base.hemoglobin);
+  const glycemicSignal = Math.max(0, base.fasting_glucose - 100) + Math.max(0, (base.hba1c - 5.7) * 18);
+  const lipidSignal =
+    Math.max(0, base.total_cholesterol - 200) +
+    Math.max(0, base.ldl_cholesterol - 100) +
+    0.45 * Math.max(0, base.triglycerides - 150);
+  const kidneySignal = Math.max(0, (base.creatinine - 1.2) * 100);
+  const riskBurden = base.abnormal_ratio * 100 + 1.4 * anemiaSignal + 0.1 * glycemicSignal + 0.035 * lipidSignal + 0.08 * kidneySignal;
+  const glucoseHba1cInteraction = (base.fasting_glucose * base.hba1c) / 100;
+  const lipidDensity = (base.total_cholesterol + base.ldl_cholesterol + 0.5 * base.triglycerides) / Math.max(base.record_count, 1);
+  const renalLoad = base.creatinine * (1 + base.abnormal_ratio) * base.record_count;
+
+  return {
+    anemia_signal: anemiaSignal,
+    glycemic_signal: glycemicSignal,
+    lipid_signal: lipidSignal,
+    kidney_signal: kidneySignal,
+    risk_burden: riskBurden,
+    glucose_hba1c_interaction: glucoseHba1cInteraction,
+    lipid_density: lipidDensity,
+    renal_load: renalLoad,
+  };
+}
+
+export function buildFeatureSnapshot(records: RecordLike[]): FeatureSnapshot {
+  const recordsWithData = records.filter(record => Object.keys(record.extractedData ?? {}).length > 0);
+  let totalMetrics = 0;
+  let abnormalMetrics = 0;
+
+  for (const record of recordsWithData) {
+    for (const metric of Object.values(record.extractedData ?? {})) {
+      totalMetrics += 1;
+      if (metric.status !== 'normal') {
+        abnormalMetrics += 1;
+      }
+    }
+  }
+
+  const base = {
+    hemoglobin: getLatestMetricValue(recordsWithData, featureDefinitions.hemoglobin.aliases) ?? 12.2,
+    fasting_glucose: getLatestMetricValue(recordsWithData, featureDefinitions.fasting_glucose.aliases) ?? 101,
+    total_cholesterol: getLatestMetricValue(recordsWithData, featureDefinitions.total_cholesterol.aliases) ?? 205,
+    creatinine: getLatestMetricValue(recordsWithData, featureDefinitions.creatinine.aliases) ?? 1.0,
+    hba1c: getLatestMetricValue(recordsWithData, featureDefinitions.hba1c.aliases) ?? 5.6,
+    ldl_cholesterol: getLatestMetricValue(recordsWithData, featureDefinitions.ldl_cholesterol.aliases) ?? 130,
+    triglycerides: getLatestMetricValue(recordsWithData, featureDefinitions.triglycerides.aliases) ?? 145,
+    abnormal_ratio: totalMetrics > 0 ? abnormalMetrics / totalMetrics : 0.18,
+    record_count: Math.max(recordsWithData.length, 1),
+  };
+
+  return {
+    ...base,
+    ...deriveEngineeredFeatures(base),
+  };
+}
+
+function formatFeatureValue(key: FeatureKey, value: number) {
+  const feature = featureDefinitions[key];
+  if (!feature) {
+    return `${key}: ${value.toFixed(2)}`;
+  }
+
+  if (feature.unit === '%' || feature.unit === 'score') {
+    return `${feature.label}: ${value.toFixed(1)} ${feature.unit}`;
+  }
+  if (feature.unit === 'count') {
+    return `${feature.label}: ${value.toFixed(0)}`;
+  }
+  return `${feature.label}: ${value.toFixed(2)} ${feature.unit}`;
+}
+
+function formatFactor(key: FeatureKey, snapshot: FeatureSnapshot) {
+  if (key === 'abnormal_ratio') {
+    return `Abnormal marker ratio is ${(snapshot.abnormal_ratio * 100).toFixed(0)}% across saved reports.`;
+  }
+  if (key === 'record_count') {
+    return `Model evaluated ${snapshot.record_count} report${snapshot.record_count === 1 ? '' : 's'} with extracted values.`;
+  }
+  return formatFeatureValue(key, snapshot[key]);
+}
+
+function getNormalizedValue(model: Extract<ModelArtifact, { model_type: 'logistic_regression' }>, key: FeatureKey, snapshot: FeatureSnapshot) {
+  return (snapshot[key] - model.means[key]) / model.scales[key];
+}
+
+function scoreLogisticModel(model: Extract<ModelArtifact, { model_type: 'logistic_regression' }>, snapshot: FeatureSnapshot) {
+  const contributions = allFeatures.map((feature) => ({
+    key: feature,
+    contribution: model.coefficients[feature] * getNormalizedValue(model, feature, snapshot),
+  }));
+
+  const linearScore = model.intercept + contributions.reduce((sum, item) => sum + item.contribution, 0);
+  const probability = sigmoid(linearScore);
+  const factors = contributions
+    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+    .slice(0, 3)
+    .map((item) => formatFactor(item.key, snapshot));
+
+  return {
+    probability,
+    factors,
+  };
+}
+
+function evaluateTree(tree: Extract<ModelArtifact, { model_type: 'random_forest' }>['trees'][number], snapshot: FeatureSnapshot) {
+  let index = 0;
+
+  while (tree.children_left[index] !== -1 && tree.children_right[index] !== -1) {
+    const featureIndex = tree.feature[index];
+    const featureName = allFeatures[featureIndex];
+    const featureValue = snapshot[featureName];
+    index = featureValue <= tree.threshold[index] ? tree.children_left[index] : tree.children_right[index];
+  }
+
+  return tree.positive_probability[index];
+}
+
+function scoreRandomForestModel(model: Extract<ModelArtifact, { model_type: 'random_forest' }>, snapshot: FeatureSnapshot) {
+  const probability =
+    model.trees.reduce((sum, tree) => sum + evaluateTree(tree, snapshot), 0) / Math.max(model.trees.length, 1);
+
+  const factors = Object.entries(model.feature_importances)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([key]) => formatFactor(key as FeatureKey, snapshot));
+
+  return {
+    probability,
+    factors,
+  };
+}
+
+function scoreModel(modelKey: ModelKey, snapshot: FeatureSnapshot): HealthRiskPrediction {
+  const artifact = modelArtifacts[modelKey];
+  const result =
+    artifact.model_type === 'logistic_regression'
+      ? scoreLogisticModel(artifact, snapshot)
+      : scoreRandomForestModel(artifact, snapshot);
+
+  const risk = toRiskLevel(result.probability, artifact.threshold);
+
+  return {
+    condition: artifact.condition,
+    risk,
+    probability: Math.round(result.probability * 100),
+    factors: result.factors,
+    recommendation: artifact.recommendation,
+    method: 'trained_model',
+    modelVersion: MODEL_VERSION,
+  };
+}
+
+export function predictHealthRisksFromSnapshot(snapshot: FeatureSnapshot) {
+  const predictions = (Object.keys(modelArtifacts) as ModelKey[]).map((modelKey) => scoreModel(modelKey, snapshot));
+  return predictions.sort((a, b) => b.probability - a.probability);
+}
+
+export function predictHealthRisksFromRecords(records: RecordLike[]) {
+  return predictHealthRisksFromSnapshot(buildFeatureSnapshot(records));
+}

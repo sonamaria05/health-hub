@@ -1,0 +1,7 @@
+project_id = "cwwqcyfwhipfzrlmfdcq"
+
+[functions.extract-medical-data]
+verify_jwt = false
+
+[functions.predict-health-risks]
+verify_jwt = false

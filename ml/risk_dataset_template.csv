@@ -1,0 +1,2 @@
+patient_id,encounter_date,hemoglobin,fasting_glucose,total_cholesterol,creatinine,hba1c,ldl_cholesterol,triglycerides,abnormal_ratio,record_count,anemia_label,diabetes_label,cardiovascular_label,kidney_label
+P100,2025-01-01,0,0,0,0,0,0,0,0,0,0,0,0,0
