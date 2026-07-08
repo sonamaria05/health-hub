@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getErrorMessage } from '@/lib/errorUtils';
 import { useRecords } from '@/lib/RecordsContext';
 import RecordCard from '@/components/RecordCard';
 import { MedicalRecord, typeLabels } from '@/lib/mockData';
@@ -37,10 +38,10 @@ export default function RecordsPage() {
     try {
       await deleteRecord(id);
       toast({ title: 'Record deleted', description: 'The record has been removed.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Delete failed',
-        description: err.message || 'We could not delete this record. Please try again.',
+        description: getErrorMessage(err, 'We could not delete this record. Please try again.'),
         variant: 'destructive',
       });
     }
@@ -55,10 +56,10 @@ export default function RecordsPage() {
       toast({ title: 'Record updated', description: 'Your changes were saved.' });
       setEditingRecord(null);
       setDraftRecord(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Update failed',
-        description: err.message || 'We could not save your changes.',
+        description: getErrorMessage(err, 'We could not save your changes.'),
         variant: 'destructive',
       });
     } finally {

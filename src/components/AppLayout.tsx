@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getErrorMessage } from '@/lib/errorUtils';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -33,10 +34,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     try {
       await resendVerification();
       toast({ title: 'Verification email sent', description: 'Check your inbox for the new link.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Could not send verification email',
-        description: error.message || 'Please try again shortly.',
+        description: getErrorMessage(error, 'Please try again shortly.'),
         variant: 'destructive',
       });
     } finally {

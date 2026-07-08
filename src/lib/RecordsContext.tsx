@@ -3,6 +3,9 @@ import { MedicalRecord, mockRecords } from './mockData';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { buildRecordSummary, deriveRecordStatus } from './recordUtils';
+import type { Database } from '@/integrations/supabase/types';
+
+type MedicalRecordRow = Database['public']['Tables']['medical_records']['Row'];
 
 const demoDataEnabled = import.meta.env.VITE_ENABLE_DEMO_DATA === 'true';
 
@@ -18,7 +21,7 @@ interface RecordsContextType {
 
 const RecordsContext = createContext<RecordsContextType | undefined>(undefined);
 
-function normalizeRecord(record: any): MedicalRecord {
+function normalizeRecord(record: MedicalRecordRow): MedicalRecord {
   return {
     id: record.id,
     type: record.type as MedicalRecord['type'],

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getErrorMessage } from '@/lib/errorUtils';
 import { BellPlus, Loader2, MailCheck, Monitor, Moon, ShieldCheck, Sun, Trash2, UserRound } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/AuthContext';
@@ -32,10 +33,10 @@ export default function SettingsPage() {
     try {
       await updateProfile({ display_name: displayName.trim() || null });
       toast({ title: 'Profile updated', description: 'Your account details were saved.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Update failed',
-        description: error.message || 'We could not save your profile changes.',
+        description: getErrorMessage(error, 'We could not save your profile changes.'),
         variant: 'destructive',
       });
     } finally {
@@ -48,10 +49,10 @@ export default function SettingsPage() {
     try {
       await resendVerification();
       toast({ title: 'Verification email sent', description: 'Check your inbox for a new verification link.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Could not send verification email',
-        description: error.message || 'Please try again in a moment.',
+        description: getErrorMessage(error, 'Please try again in a moment.'),
         variant: 'destructive',
       });
     } finally {

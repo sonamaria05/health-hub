@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getErrorMessage } from '@/lib/errorUtils';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,8 +43,8 @@ export default function ResetPasswordPage() {
       if (error) throw error;
       toast({ title: 'Password updated!', description: 'You can now sign in with your new password.' });
       navigate('/auth');
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }

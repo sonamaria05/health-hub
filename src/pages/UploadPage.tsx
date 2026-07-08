@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { getErrorMessage } from '@/lib/errorUtils';
 import { Upload, CheckCircle, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRecords } from '@/lib/RecordsContext';
@@ -93,8 +94,8 @@ export default function UploadPage() {
           if (extractionData?.error) throw new Error(extractionData.error);
 
           extractedRecord = extractionData.record as EditableRecord;
-        } catch (remoteError: any) {
-          localFallbackReason = remoteError?.message || 'Cloud extraction failed';
+        } catch (remoteError: unknown) {
+          localFallbackReason = getErrorMessage(remoteError, 'Cloud extraction failed');
           console.error('Remote extraction failed, falling back to local parser:', remoteError);
         }
       }
@@ -127,13 +128,13 @@ export default function UploadPage() {
       });
       setError(reviewMessage);
       setStep('extracted');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Processing error:', err);
       if (uploadedFilePath) {
         await cleanupUploadedFile(uploadedFilePath);
       }
       setFilePath('');
-      const extractedError = err.message || 'Failed to process file';
+      const extractedError = getErrorMessage(err, 'Failed to process file');
       setError(extractedError);
       const fallbackRecord: EditableRecord = {
         type: 'blood_test',
@@ -201,14 +202,14 @@ export default function UploadPage() {
       setStep('done');
       toast({ title: 'Record saved', description: 'Your medical record has been stored securely.' });
       setTimeout(() => navigate('/records'), 1200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (filePath) {
         await cleanupUploadedFile(filePath);
         setFilePath('');
       }
       toast({
         title: 'Save failed',
-        description: err.message || 'We could not save this record. Please try again.',
+        description: getErrorMessage(err, 'We could not save this record. Please try again.'),
         variant: 'destructive',
       });
     }
