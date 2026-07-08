@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
+
+type AppRole = Database['public']['Enums']['app_role'];
 
 interface Profile {
   display_name: string | null;
@@ -12,8 +15,11 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profile: Profile | null;
+  roles: AppRole[];
+  rolesLoading: boolean;
+  hasRole: (role: AppRole) => boolean;
   isEmailVerified: boolean;
-  signOut: () => Promise<void>;
+  signOut: (scope?: 'local' | 'global') => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   resendVerification: () => Promise<void>;
 }
@@ -25,8 +31,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
 
   useEffect(() => {
+    const loadRoles = async (nextUser: User | null) => {
+      if (!nextUser) {
+        setRoles([]);
+        setRolesLoading(false);
+        return;
+      }
+
+      setRolesLoading(true);
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', nextUser.id);
+
+      if (error) {
+        console.error('Error loading roles:', error);
+        // Fail closed: an error fetching roles must not silently grant access.
+        setRoles([]);
+      } else {
+        setRoles((data ?? []).map((row) => row.role));
+      }
+      setRolesLoading(false);
+    };
+
     const loadProfile = async (nextUser: User | null) => {
       if (!nextUser) {
         setProfile(null);
@@ -79,8 +110,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(nextSession?.user ?? null);
       setLoading(false);
       void loadProfile(nextSession?.user ?? null);
+      void loadRoles(nextSession?.user ?? null);
     };
 
+    // Supabase's client library automatically refreshes the access token
+    // using the refresh token before it expires. If that refresh fails
+    // (token revoked, expired, or the session was invalidated elsewhere -
+    // e.g. via "sign out of all devices"), the SDK fires SIGNED_OUT here.
+    // Routing every event through handleSession ensures local auth/role
+    // state is always cleared the moment that happens, rather than leaving
+    // the UI showing a stale "signed in" state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       handleSession(nextSession);
     });
@@ -92,9 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const signOut = async (scope: 'local' | 'global' = 'local') => {
+    // scope: 'global' revokes every refresh token for this user (all
+    // devices/sessions), not just the current browser tab.
+    await supabase.auth.signOut({ scope });
   };
+
+  const hasRole = useCallback((role: AppRole) => roles.includes(role), [roles]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) throw new Error('You must be signed in to update your profile.');
@@ -136,6 +179,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         loading,
         profile,
+        roles,
+        rolesLoading,
+        hasRole,
         isEmailVerified: Boolean(user?.email_confirmed_at) || !user?.email,
         signOut,
         updateProfile,
