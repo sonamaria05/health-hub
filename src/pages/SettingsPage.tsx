@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getErrorMessage } from '@/lib/errorUtils';
-import { BellPlus, Loader2, MailCheck, Monitor, Moon, ShieldCheck, Sun, Trash2, UserRound } from 'lucide-react';
+import { BellPlus, Loader2, LogOut, MailCheck, Monitor, Moon, ShieldCheck, Sun, Trash2, UserRound } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,16 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useReminders } from '@/lib/RemindersContext';
+import MfaEnrollment from '@/components/MfaEnrollment';
 
 export default function SettingsPage() {
-  const { user, profile, updateProfile, resendVerification, isEmailVerified } = useAuth();
+  const { user, profile, updateProfile, resendVerification, isEmailVerified, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { reminders, addReminder, toggleReminder, deleteReminder } = useReminders();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [saving, setSaving] = useState(false);
   const [sendingVerification, setSendingVerification] = useState(false);
+  const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderTime, setReminderTime] = useState('');
   const [reminderNotes, setReminderNotes] = useState('');
@@ -57,6 +59,22 @@ export default function SettingsPage() {
       });
     } finally {
       setSendingVerification(false);
+    }
+  };
+
+  const handleSignOutEverywhere = async () => {
+    setSigningOutEverywhere(true);
+    try {
+      await signOut('global');
+      toast({ title: 'Signed out everywhere', description: 'All your active sessions have been revoked.' });
+    } catch (error: unknown) {
+      toast({
+        title: 'Could not sign out of all devices',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSigningOutEverywhere(false);
     }
   };
 
@@ -225,6 +243,20 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">
             Password resets are available from the sign-in page. For production, keep email verification enabled in Supabase auth settings.
           </p>
+
+          <MfaEnrollment />
+
+          <div className="rounded-xl border border-border p-4 space-y-3">
+            <p className="text-sm font-medium">Sessions</p>
+            <p className="text-sm text-muted-foreground">
+              Signed in on a device you don't recognize? Sign out everywhere to revoke all active sessions,
+              including this one.
+            </p>
+            <Button variant="outline" size="sm" onClick={handleSignOutEverywhere} disabled={signingOutEverywhere}>
+              {signingOutEverywhere ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}
+              Sign out of all devices
+            </Button>
+          </div>
           </div>
         </div>
       </div>

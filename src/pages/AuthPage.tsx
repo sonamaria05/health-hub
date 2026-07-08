@@ -16,7 +16,29 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
   const { toast } = useToast();
+
+  const handleMfaVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaFactorId || !mfaChallengeId) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: mfaChallengeId,
+        code: mfaCode.trim(),
+      });
+      if (error) throw error;
+      // On success, onAuthStateChange fires and AuthContext takes over.
+    } catch (err: unknown) {
+      toast({ title: 'Invalid code', description: getErrorMessage(err, 'Please check the code and try again.'), variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +72,51 @@ export default function AuthPage() {
         toast({ title: 'Check your email', description: 'Please verify your email address to continue.' });
         setPassword('');
       } else {
+        const { data: locked, error: lockError } = await supabase.rpc('is_account_locked', {
+          _email: normalizedEmail,
+        });
+        if (lockError) {
+          // Fail open on infra errors so a lockout-check outage doesn't lock
+          // everyone out of the app entirely; the RLS/auth layer is still
+          // the real security boundary.
+          console.error('Error checking account lockout status:', lockError);
+        } else if (locked) {
+          throw new Error('Too many failed sign-in attempts. Please try again in 15 minutes.');
+        }
+
         const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+
+        const { error: recordError } = await supabase.rpc('record_login_attempt', {
+          _email: normalizedEmail,
+          _success: !error,
+          _user_agent: navigator.userAgent,
+        });
+        if (recordError) console.error('Error recording login attempt:', recordError);
+
         if (error) throw error;
+
+        // If the account has an enrolled TOTP factor, Supabase issues an
+        // aal1 session that isn't fully authenticated until a second-factor
+        // challenge is completed. Detect that and show the MFA step instead
+        // of letting the (incomplete) session pass through as "signed in".
+        const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalError) throw aalError;
+
+        if (aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+          const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+          if (factorsError) throw factorsError;
+
+          const totpFactor = factorsData.totp.find((f) => f.status === 'verified');
+          if (!totpFactor) throw new Error('MFA is required but no verified factor was found. Contact support.');
+
+          const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+            factorId: totpFactor.id,
+          });
+          if (challengeError) throw challengeError;
+
+          setMfaFactorId(totpFactor.id);
+          setMfaChallengeId(challenge.id);
+        }
       }
     } catch (err: unknown) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
@@ -82,12 +147,37 @@ export default function AuthPage() {
           <img src="/favicon.svg" alt="Healytics logo" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
           <h1 className="text-3xl font-heading font-bold gradient-text">Healytics</h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            {mode === 'login' ? 'Sign in to access your medical records' :
+            {mfaChallengeId ? 'Enter the 6-digit code from your authenticator app' :
+             mode === 'login' ? 'Sign in to access your medical records' :
              mode === 'signup' ? 'Create your account to get started' :
              'Reset your password'}
           </p>
         </div>
 
+        {mfaChallengeId ? (
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-5">
+            <form onSubmit={handleMfaVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="mfa-code">Authentication code</Label>
+                <Input
+                  id="mfa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  maxLength={6}
+                  required
+                  autoFocus
+                />
+              </div>
+              <Button type="submit" className="w-full gradient-primary text-primary-foreground border-0 h-11" disabled={loading}>
+                {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Verify
+              </Button>
+            </form>
+          </div>
+        ) : (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-5">
           {mode !== 'forgot' && (
             <>
@@ -176,6 +266,7 @@ export default function AuthPage() {
             )}
           </p>
         </div>
+        )}
       </motion.div>
     </div>
   );

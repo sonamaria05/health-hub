@@ -97,7 +97,7 @@ async function fulfillJson(route: Route, data: unknown, status = 200) {
   });
 }
 
-export async function mockAuthenticatedSession(page: Page) {
+export async function mockAuthenticatedSession(page: Page, roles: string[] = ['patient']) {
   await page.addInitScript(
     ({ key, session, reminderKey }) => {
       window.localStorage.setItem(key, JSON.stringify(session));
@@ -143,6 +143,11 @@ export async function mockAuthenticatedSession(page: Page) {
     if (url.pathname.endsWith('/rest/v1/profiles') && ['POST', 'PATCH'].includes(route.request().method())) {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       await fulfillJson(route, [{ ...mockProfile, ...body }]);
+      return;
+    }
+
+    if (url.pathname.endsWith('/rest/v1/user_roles') && route.request().method() === 'GET') {
+      await fulfillJson(route, roles.map((role) => ({ role })));
       return;
     }
 
