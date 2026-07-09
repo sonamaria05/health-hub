@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { FileText, Download, ExternalLink, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getErrorMessage } from '@/lib/errorUtils';
 
 interface FileViewerProps {
   filePath: string;
@@ -19,9 +20,11 @@ export default function FileViewer({ filePath, fileName, onClose }: FileViewerPr
 
     const loadSignedUrl = async () => {
       setUrlLoading(true);
+      // Short TTL: this is regenerated fresh each time the viewer opens, so
+      // there's no need for the link to remain valid for long after that.
       const { data, error } = await supabase.storage
         .from('medical-reports')
-        .createSignedUrl(filePath, 60 * 60);
+        .createSignedUrl(filePath, 5 * 60);
 
       if (ignore) return;
 
@@ -53,8 +56,8 @@ export default function FileViewer({ filePath, fileName, onClose }: FileViewerPr
       a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Download error:', err);
+    } catch (err: unknown) {
+      console.error('Download error:', getErrorMessage(err));
     } finally {
       setLoading(false);
     }

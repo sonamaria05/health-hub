@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useReminders } from '@/lib/RemindersContext';
 import MfaEnrollment from '@/components/MfaEnrollment';
+import MyActivity from '@/components/MyActivity';
 
 export default function SettingsPage() {
   const { user, profile, updateProfile, resendVerification, isEmailVerified, signOut } = useAuth();
@@ -257,6 +258,8 @@ export default function SettingsPage() {
               Sign out of all devices
             </Button>
           </div>
+
+          <MyActivity />
           </div>
         </div>
       </div>
