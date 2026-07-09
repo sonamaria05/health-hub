@@ -9,6 +9,7 @@ import {
   validationErrorResponse,
 } from "../_shared/http.ts";
 import { extractMedicalDataSchema } from "../_shared/schemas.ts";
+import { encryptPhi } from "../_shared/crypto.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -178,12 +179,39 @@ If a field is unknown, return a reasonable empty or fallback value instead of in
       is_critical: extractedRecord.status === "critical" ? 1 : 0,
     };
 
+    // Application-layer encryption of free-text PHI fields, on top of (not
+    // instead of) Supabase's at-rest encryption - see supabase/functions/_shared/crypto.ts.
+    // Additive: populates *_encrypted alongside the plaintext fields rather
+    // than replacing them, since making the encrypted columns the sole
+    // source of truth requires updating every read path in the app
+    // (RecordsContext, DashboardPage, AnalyticsPage, PredictionsPage) to
+    // decrypt on fetch - a broader data-layer change tracked separately
+    // rather than shipped unverified against a live database from here.
+    const phiEncryptionKey = Deno.env.get("PHI_ENCRYPTION_KEY");
+    let notesEncrypted: string | null = null;
+    let extractedDataEncrypted: string | null = null;
+    if (phiEncryptionKey) {
+      try {
+        if (extractedRecord.summary) {
+          notesEncrypted = await encryptPhi(String(extractedRecord.summary), phiEncryptionKey);
+        }
+        if (extractedRecord.extractedData) {
+          extractedDataEncrypted = await encryptPhi(JSON.stringify(extractedRecord.extractedData), phiEncryptionKey);
+        }
+      } catch (encryptError) {
+        // Never fail the whole extraction because encryption had a problem -
+        // log it so it's visible in function logs and investigate separately.
+        console.error("PHI encryption failed:", encryptError);
+      }
+    }
+
     return jsonResponse({
       record: {
         ...extractedRecord,
         processingStatus: "processed",
       },
       mlData: { features: mlFeatures, labels: mlLabels },
+      encrypted: { notesEncrypted, extractedDataEncrypted },
     }, 200);
   } catch (error) {
     return internalErrorResponse("extract-medical-data error", error);
