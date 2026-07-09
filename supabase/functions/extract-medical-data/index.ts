@@ -1,11 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  enforceRateLimit,
+  internalErrorResponse,
+  jsonResponse,
+  unauthorizedResponse,
+  validationErrorResponse,
+} from "../_shared/http.ts";
+import { extractMedicalDataSchema } from "../_shared/schemas.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,10 +18,7 @@ serve(async (req) => {
   try {
     const authorization = req.headers.get("Authorization");
     if (!authorization) {
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return unauthorizedResponse("Missing authorization header");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -29,20 +29,29 @@ serve(async (req) => {
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized request" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return unauthorizedResponse();
     }
 
-    const { fileBase64, fileName, mimeType } = await req.json();
+    const rateLimitResponse = await enforceRateLimit(supabase, req, "extract-medical-data", authData.user.id, {
+      perUserMax: 20,
+      perUserWindowSeconds: 600,
+      perIpMax: 60,
+      perIpWindowSeconds: 600,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
 
-    if (!fileBase64 || !fileName) {
-      return new Response(JSON.stringify({ error: "fileBase64 and fileName are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return validationErrorResponse("Request body must be valid JSON");
     }
+
+    const parsed = extractMedicalDataSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationErrorResponse("Invalid request payload", parsed.error.flatten());
+    }
+    const { fileBase64, fileName, mimeType } = parsed.data;
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) {
@@ -141,11 +150,10 @@ If a field is unknown, return a reasonable empty or fallback value instead of in
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-
-      return new Response(JSON.stringify({ error: `AI gateway error: ${response.status}` }), {
-        status: response.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // AI gateway status codes map reasonably onto our own response (e.g.
+      // its 429 should still surface as a 429 to our client), but the body
+      // is internal detail and is not forwarded.
+      return jsonResponse({ error: "The document processing service is currently unavailable." }, response.status);
     }
 
     const result = await response.json();
@@ -170,20 +178,14 @@ If a field is unknown, return a reasonable empty or fallback value instead of in
       is_critical: extractedRecord.status === "critical" ? 1 : 0,
     };
 
-    return new Response(JSON.stringify({
+    return jsonResponse({
       record: {
         ...extractedRecord,
         processingStatus: "processed",
       },
       mlData: { features: mlFeatures, labels: mlLabels },
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    }, 200);
   } catch (error) {
-    console.error("extract-medical-data error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return internalErrorResponse("extract-medical-data error", error);
   }
 });

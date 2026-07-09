@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import { buildExtractionPayload, canAttemptRemoteExtraction, extractMedicalRecordLocally } from '@/lib/documentProcessing';
 import { buildRecordSummary, deriveRecordStatus, validateUploadFile } from '@/lib/recordUtils';
+import { extractMedicalDataSchema } from '@/lib/schemas/edgeFunctionSchemas';
 
 type Step = 'upload' | 'scanning' | 'extracted' | 'done';
 
@@ -81,13 +82,13 @@ export default function UploadPage() {
       if (canAttemptRemoteExtraction(file)) {
         try {
           const extractionPayload = await buildExtractionPayload(file);
+          const parsed = extractMedicalDataSchema.safeParse(extractionPayload);
+          if (!parsed.success) {
+            throw new Error(parsed.error.issues[0]?.message ?? 'Invalid file for extraction');
+          }
 
           const { data: extractionData, error: fnError } = await supabase.functions.invoke('extract-medical-data', {
-            body: {
-              fileBase64: extractionPayload.fileBase64,
-              fileName: extractionPayload.fileName,
-              mimeType: extractionPayload.mimeType,
-            },
+            body: parsed.data,
           });
 
           if (fnError) throw new Error(`Extraction failed: ${fnError.message}`);

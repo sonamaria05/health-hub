@@ -1,12 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { predictHealthRisksFromSnapshot } from "../../../src/lib/mlRisk.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import {
+  corsHeaders,
+  enforceRateLimit,
+  internalErrorResponse,
+  jsonResponse,
+  unauthorizedResponse,
+  validationErrorResponse,
+} from "../_shared/http.ts";
+import { predictHealthRisksSchema } from "../_shared/schemas.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,10 +19,7 @@ serve(async (req) => {
   try {
     const authorization = req.headers.get("Authorization");
     if (!authorization) {
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return unauthorizedResponse("Missing authorization header");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -30,34 +30,38 @@ serve(async (req) => {
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized request" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return unauthorizedResponse();
     }
 
-    const { featureSnapshot } = await req.json();
-    if (!featureSnapshot) {
-      return new Response(JSON.stringify({ error: "featureSnapshot is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const rateLimitResponse = await enforceRateLimit(supabase, req, "predict-health-risks", authData.user.id, {
+      perUserMax: 30,
+      perUserWindowSeconds: 600,
+      perIpMax: 90,
+      perIpWindowSeconds: 600,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return validationErrorResponse("Request body must be valid JSON");
     }
 
-    const predictions = predictHealthRisksFromSnapshot(featureSnapshot);
+    const parsed = predictHealthRisksSchema.safeParse(body);
+    if (!parsed.success) {
+      return validationErrorResponse("Invalid request payload", parsed.error.flatten());
+    }
 
-    return new Response(JSON.stringify({
+    const predictions = predictHealthRisksFromSnapshot(parsed.data.featureSnapshot);
+    const modelVersion = predictions[0]?.modelVersion ?? "demo-logreg-v1";
+
+    return jsonResponse({
       predictions,
       source: "backend_model",
-      modelVersion: predictions[0]?.modelVersion ?? "demo-logreg-v1",
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      modelVersion,
+    }, 200);
   } catch (error) {
-    console.error("predict-health-risks error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return internalErrorResponse("predict-health-risks error", error);
   }
 });
