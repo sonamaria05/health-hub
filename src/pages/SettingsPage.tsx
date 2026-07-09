@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useReminders } from '@/lib/RemindersContext';
 import MfaEnrollment from '@/components/MfaEnrollment';
 import MyActivity from '@/components/MyActivity';
+import DeleteAccount from '@/components/DeleteAccount';
 
 export default function SettingsPage() {
   const { user, profile, updateProfile, resendVerification, isEmailVerified, signOut } = useAuth();
@@ -260,6 +261,8 @@ export default function SettingsPage() {
           </div>
 
           <MyActivity />
+
+          <DeleteAccount />
           </div>
         </div>
       </div>
