@@ -56,6 +56,19 @@ serve(async (req) => {
     const predictions = predictHealthRisksFromSnapshot(parsed.data.featureSnapshot);
     const modelVersion = predictions[0]?.modelVersion ?? "demo-logreg-v1";
 
+    // Structured log for retraining audits: which model version served this
+    // prediction, and for which user/conditions. This is function-log-level
+    // visibility for now; a queryable `model_training_runs` /
+    // `prediction_log` table (Task 4) is the next step for making this
+    // auditable from the database rather than only from log output.
+    console.log(JSON.stringify({
+      event: "prediction_served",
+      model_version: modelVersion,
+      user_id: authData.user.id,
+      conditions: predictions.map((p) => p.condition),
+      served_at: new Date().toISOString(),
+    }));
+
     return jsonResponse({
       predictions,
       source: "backend_model",

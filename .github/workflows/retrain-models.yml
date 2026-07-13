@@ -1,0 +1,80 @@
+name: Retrain risk models
+
+# Nightly automatic retrain, plus an on-demand button in the Actions tab.
+# Does NOT auto-merge anything - it opens a PR so a human reviews the new
+# metrics (especially on a dataset this small, where metric swings between
+# runs can be noise rather than a real improvement - see ml/MODEL_CARD.md).
+on:
+  schedule:
+    - cron: "0 7 * * *" # 07:00 UTC nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Retrain models
+        run: python scripts/train_risk_models.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet -- ml/ src/lib/generated/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node (for the quality gate on the regenerated TS artifacts)
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node dependencies
+        if: steps.diff.outputs.changed == 'true'
+        run: npm ci
+
+      - name: Verify regenerated artifacts still pass the quality gate
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          npm run lint
+          npm run test
+          npm run build
+
+      - name: Open pull request with updated model artifacts
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(ml): scheduled model retrain"
+          title: "Scheduled model retrain - review metrics before merging"
+          branch: ml-retrain/automated
+          delete-branch: true
+          body: |
+            Automated retrain via `.github/workflows/retrain-models.yml`.
+
+            **Before merging**, check `ml/MODEL_CARD.md` in this PR's diff for:
+            - Whether the selected model changed for any target, and why (compare the candidate comparison table)
+            - Whether AUC/F1 moved more than would be expected from cross-validation noise on this dataset size (see the "Known limitations" section)
+            - Whether calibration (Brier score) improved or regressed
+
+            This workflow only opens the PR - it does not auto-merge. A human should review the metrics diff before this goes live, especially given the dataset's small size (see `ml/validated_dataset_sources.md`).
+          add-paths: |
+            ml/
+            src/lib/generated/
