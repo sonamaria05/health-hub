@@ -52,6 +52,7 @@ const MODEL_VERSION = mlArtifacts.model_version;
 const featureDefinitions = mlArtifacts.feature_definitions;
 const modelArtifacts = mlArtifacts.models;
 const allFeatures = mlArtifacts.all_features as unknown as readonly FeatureKey[];
+const featureBaseline = mlArtifacts.feature_baseline;
 
 function sigmoid(value: number) {
   return 1 / (1 + Math.exp(-value));
@@ -80,7 +81,7 @@ function getLatestMetricValue(records: RecordLike[], aliases: readonly string[])
   return undefined;
 }
 
-function deriveEngineeredFeatures(base: Omit<FeatureSnapshot, 'anemia_signal' | 'glycemic_signal' | 'lipid_signal' | 'kidney_signal' | 'risk_burden' | 'glucose_hba1c_interaction' | 'lipid_density' | 'renal_load'>) {
+export function deriveEngineeredFeatures(base: Omit<FeatureSnapshot, 'anemia_signal' | 'glycemic_signal' | 'lipid_signal' | 'kidney_signal' | 'risk_burden' | 'glucose_hba1c_interaction' | 'lipid_density' | 'renal_load'>) {
   const anemiaSignal = Math.max(0, 12 - base.hemoglobin);
   const glycemicSignal = Math.max(0, base.fasting_glucose - 100) + Math.max(0, (base.hba1c - 5.7) * 18);
   const lipidSignal =
@@ -185,6 +186,69 @@ function scoreLogisticModel(model: Extract<ModelArtifact, { model_type: 'logisti
   };
 }
 
+function evaluateXgboostTree(tree: Extract<ModelArtifact, { model_type: 'xgboost' }>['trees'][number], snapshot: FeatureSnapshot) {
+  let index = 0;
+
+  while (tree.children_left[index] !== -1) {
+    const featureIndex = tree.feature[index];
+    const featureName = allFeatures[featureIndex];
+    // XGBoost stores split thresholds as float32 internally. Comparing in
+    // full float64 precision can put a feature value on the wrong side of
+    // a split when it's extremely close to (or exactly at) the boundary -
+    // verified empirically against real sklearn/xgboost output during
+    // training (see the comment in scripts/train_risk_models.py's
+    // serialize_xgboost). Math.fround rounds both operands to float32 to
+    // match XGBoost's actual comparison precision.
+    const featureValue = Math.fround(snapshot[featureName]);
+    const threshold = Math.fround(tree.threshold[index]);
+    index = featureValue < threshold ? tree.children_left[index] : tree.children_right[index];
+  }
+
+  return tree.leaf_value[index];
+}
+
+function scoreXgboostModel(model: Extract<ModelArtifact, { model_type: 'xgboost' }>, snapshot: FeatureSnapshot) {
+  // base_score is fixed to 0.5 (logit 0) at training time, so the raw
+  // probability is simply sigmoid(sum of leaf margins) with no separate
+  // base-margin term - see candidate_models() in train_risk_models.py.
+  const margin = model.trees.reduce((sum, tree) => sum + evaluateXgboostTree(tree, snapshot), 0);
+  const probability = sigmoid(margin);
+
+  const factors = shapInformedFactors(model.shap_importance, snapshot);
+
+  return { probability, factors };
+}
+
+/**
+ * Per-instance factor selection for tree-based models (random_forest,
+ * xgboost), used because exactly reproducing SHAP's TreeExplainer
+ * algorithm in a hand-written TS interpreter (to run without a Python
+ * backend at inference time) would be substantial additional surface area
+ * we can't verify here without a way to cross-check it numerically at
+ * runtime. Instead: each feature's contribution is approximated as its
+ * real SHAP-derived global importance (computed in Python during training,
+ * via the actual `shap` library - see compute_shap_importance in
+ * scripts/train_risk_models.py) weighted by how far this specific
+ * patient's value deviates from the training population's mean, in
+ * standard-deviation units. A feature that is both influential overall AND
+ * unusual for this patient surfaces as a top factor; this is a documented
+ * approximation of true per-instance SHAP, not a re-implementation of it.
+ */
+function shapInformedFactors(shapImportance: Partial<Record<FeatureKey, number>>, snapshot: FeatureSnapshot) {
+  const scored = Object.entries(shapImportance).map(([key, importance]) => {
+    const featureKey = key as FeatureKey;
+    const mean = featureBaseline.mean[featureKey] ?? 0;
+    const std = featureBaseline.std[featureKey] ?? 1;
+    const zScore = (snapshot[featureKey] - mean) / (std || 1);
+    return { key: featureKey, score: Math.abs(importance * zScore) };
+  });
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((item) => formatFactor(item.key, snapshot));
+}
+
 function evaluateTree(tree: Extract<ModelArtifact, { model_type: 'random_forest' }>['trees'][number], snapshot: FeatureSnapshot) {
   let index = 0;
 
@@ -202,10 +266,7 @@ function scoreRandomForestModel(model: Extract<ModelArtifact, { model_type: 'ran
   const probability =
     model.trees.reduce((sum, tree) => sum + evaluateTree(tree, snapshot), 0) / Math.max(model.trees.length, 1);
 
-  const factors = Object.entries(model.feature_importances)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([key]) => formatFactor(key as FeatureKey, snapshot));
+  const factors = shapInformedFactors(model.shap_importance, snapshot);
 
   return {
     probability,
@@ -213,19 +274,27 @@ function scoreRandomForestModel(model: Extract<ModelArtifact, { model_type: 'ran
   };
 }
 
+function applyCalibration(rawProbability: number, calibration: { coefficient: number; intercept: number } | undefined) {
+  if (!calibration) return rawProbability;
+  return sigmoid(calibration.coefficient * rawProbability + calibration.intercept);
+}
+
 function scoreModel(modelKey: ModelKey, snapshot: FeatureSnapshot): HealthRiskPrediction {
   const artifact = modelArtifacts[modelKey];
   const result =
     artifact.model_type === 'logistic_regression'
       ? scoreLogisticModel(artifact, snapshot)
-      : scoreRandomForestModel(artifact, snapshot);
+      : artifact.model_type === 'xgboost'
+        ? scoreXgboostModel(artifact, snapshot)
+        : scoreRandomForestModel(artifact, snapshot);
 
-  const risk = toRiskLevel(result.probability, artifact.threshold);
+  const calibratedProbability = applyCalibration(result.probability, artifact.calibration);
+  const risk = toRiskLevel(calibratedProbability, artifact.threshold);
 
   return {
     condition: artifact.condition,
     risk,
-    probability: Math.round(result.probability * 100),
+    probability: Math.round(calibratedProbability * 100),
     factors: result.factors,
     recommendation: artifact.recommendation,
     method: 'trained_model',

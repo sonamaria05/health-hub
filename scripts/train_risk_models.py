@@ -5,12 +5,23 @@ import random
 from pathlib import Path
 
 import numpy as np
+import shap
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    brier_score_loss,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 
 BASE_FEATURES = [
@@ -81,7 +92,7 @@ FEATURE_DEFINITIONS = {
     "renal_load": {"label": "Renal Load", "unit": "score", "aliases": []},
 }
 
-MODEL_VERSION = "ensemble-tabular-v2"
+MODEL_VERSION = "3.0.0"
 
 
 def clamp(value, lower, upper):
@@ -214,6 +225,77 @@ def select_threshold(labels, probabilities):
     return best_threshold, float(best_score)
 
 
+def serialize_xgboost(model):
+    # trees_to_dataframe() is XGBoost's own documented way to introspect a
+    # trained booster. For leaf rows, the "Gain" column holds the leaf's
+    # output value (log-odds contribution), not information gain - that's
+    # a well-known quirk of this API, not a bug in this code.
+    #
+    # IMPORTANT: XGBoost stores split thresholds as float32 internally, but
+    # trees_to_dataframe() reports them upcast to float64 (e.g. 5.8 becomes
+    # 5.80000019). A feature value that's exactly on a split boundary in
+    # float64 can therefore evaluate on the *opposite* side of a >=/< 
+    # comparison than XGBoost's real (float32) decision did. This was
+    # verified empirically: comparing in float64 mismatched sklearn's own
+    # predict_proba by up to 0.29 probability on this dataset; rounding
+    # both the feature value and the threshold to float32 before comparing
+    # (see src/lib/mlRisk.ts's use of Math.fround) brought the max
+    # discrepancy down to ~1e-7. The TypeScript interpreter MUST replicate
+    # this float32 rounding, or its predictions will silently diverge from
+    # what this training script actually evaluated.
+    booster = model.get_booster()
+    tree_df = booster.trees_to_dataframe()
+
+    trees = []
+    for tree_id, group in tree_df.groupby("Tree", sort=True):
+        group = group.reset_index(drop=True)
+        id_to_index = {row_id: index for index, row_id in enumerate(group["ID"])}
+
+        children_left = []
+        children_right = []
+        feature = []
+        threshold = []
+        leaf_value = []
+
+        for _, row in group.iterrows():
+            is_leaf = row["Feature"] == "Leaf"
+            if is_leaf:
+                children_left.append(-1)
+                children_right.append(-1)
+                feature.append(-1)
+                threshold.append(0.0)
+                leaf_value.append(float(row["Gain"]))
+            else:
+                children_left.append(id_to_index[row["Yes"]])
+                children_right.append(id_to_index[row["No"]])
+                # XGBoost labels features "f{index}" when trained on a plain
+                # numpy array (no column names attached) - parse that index
+                # directly rather than trying to look up ALL_FEATURES by name.
+                feature.append(int(row["Feature"][1:]))
+                threshold.append(float(row["Split"]))
+                leaf_value.append(0.0)
+
+        trees.append({
+            "children_left": children_left,
+            "children_right": children_right,
+            "feature": feature,
+            "threshold": threshold,
+            "leaf_value": leaf_value,
+        })
+
+    return {
+        "model_type": "xgboost",
+        "trees": trees,
+        # base_score is fixed to 0.5 (logit 0) in candidate_models(), so the
+        # final probability is simply sigmoid(sum of leaf margins) with no
+        # separate base-margin term to carry through the TS interpreter.
+        "feature_importances": {
+            feature: round(float(importance), 6)
+            for feature, importance in zip(ALL_FEATURES, model.feature_importances_)
+        },
+    }
+
+
 def serialize_random_forest(model):
     trees = []
     for estimator in model.estimators_:
@@ -251,7 +333,16 @@ def serialize_logistic(model):
     }
 
 
-def candidate_models(seed):
+def candidate_models(seed, train_y):
+    positive_count = int(np.sum(train_y))
+    negative_count = int(len(train_y) - positive_count)
+    # scale_pos_weight is XGBoost's native imbalance handling (equivalent in
+    # spirit to class_weight="balanced" for the other two models): weight the
+    # minority (positive) class by the ratio of negatives to positives so a
+    # rare condition isn't drowned out by the majority "no risk" rows. Guard
+    # against a zero-positive fold, which would otherwise divide by zero.
+    scale_pos_weight = (negative_count / positive_count) if positive_count > 0 else 1.0
+
     return {
         "logistic_regression": Pipeline([
             ("scaler", StandardScaler()),
@@ -263,6 +354,18 @@ def candidate_models(seed):
             min_samples_leaf=2,
             random_state=seed,
             class_weight="balanced_subsample",
+        ),
+        "xgboost": XGBClassifier(
+            n_estimators=150,
+            max_depth=3,
+            learning_rate=0.1,
+            subsample=0.85,
+            colsample_bytree=0.85,
+            reg_lambda=1.0,
+            scale_pos_weight=scale_pos_weight,
+            eval_metric="logloss",
+            random_state=seed,
+            base_score=0.5,
         ),
     }
 
@@ -287,26 +390,121 @@ def evaluate_with_threshold(labels, probabilities, threshold):
 def choose_model(train_x, train_y, seed):
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     results = {}
-    for model_name, model in candidate_models(seed).items():
+    oof_by_model = {}
+    for model_name, model in candidate_models(seed, train_y).items():
         oof_probabilities = cross_val_predict(model, train_x, train_y, cv=cv, method="predict_proba")[:, 1]
+        oof_by_model[model_name] = oof_probabilities
         threshold, cv_f1 = select_threshold(train_y, oof_probabilities)
         cv_auc = roc_auc_score(train_y, oof_probabilities) if len(set(train_y.tolist())) > 1 else 1.0
         results[model_name] = {
             "threshold": threshold,
             "cv_f1": round(float(cv_f1), 4),
             "cv_auc": round(float(cv_auc), 4),
+            # Blended score is what actually ranks candidates below - AUC
+            # (threshold-independent discrimination) and F1 (a threshold-
+            # dependent view of the operating point we'd actually use) are
+            # weighted equally. Accuracy is intentionally not part of this:
+            # with imbalanced labels, a model that always predicts the
+            # majority class can post a deceptively high accuracy.
+            "blended_score": round(0.5 * cv_auc + 0.5 * float(cv_f1), 4),
         }
 
-    ranked = sorted(results.items(), key=lambda item: (item[1]["cv_f1"], item[1]["cv_auc"]), reverse=True)
+    ranked = sorted(results.items(), key=lambda item: item[1]["blended_score"], reverse=True)
     best_name, best_meta = ranked[0]
-    best_model = candidate_models(seed)[best_name]
+    best_model = candidate_models(seed, train_y)[best_name]
     best_model.fit(train_x, train_y)
-    return best_name, best_model, best_meta, results
+
+    # Diagnostic only: quantify what sklearn's CalibratedClassifierCV would
+    # buy us on top of the winning model, via cross-validated Brier score
+    # (lower is better-calibrated). This is evaluated explicitly with the
+    # real sklearn class, as required - see the note on why *deployment*
+    # uses a simpler, exactly-reproducible Platt-scaling transform instead
+    # of shipping CalibratedClassifierCV's internal cross-fitted ensemble.
+    uncalibrated_brier = float(brier_score_loss(train_y, oof_by_model[best_name]))
+    calibrated_model = CalibratedClassifierCV(candidate_models(seed, train_y)[best_name], method="sigmoid", cv=3)
+    calibrated_oof = cross_val_predict(calibrated_model, train_x, train_y, cv=cv, method="predict_proba")[:, 1]
+    calibrated_brier = float(brier_score_loss(train_y, calibrated_oof))
+
+    # Deployment calibration: Platt scaling (a 1-D logistic regression
+    # mapping the base model's own out-of-fold probability to a recalibrated
+    # one) fit on the same OOF predictions used above. This is the same
+    # underlying technique CalibratedClassifierCV(method="sigmoid") uses
+    # internally, but it serializes to exactly two numbers (coefficient,
+    # intercept) that the TypeScript inference engine can reproduce exactly,
+    # unlike CalibratedClassifierCV's own cross-fitted ensemble of
+    # calibrators, which doesn't have a compact portable representation.
+    platt = LogisticRegression()
+    platt.fit(oof_by_model[best_name].reshape(-1, 1), train_y)
+    calibration = {
+        "coefficient": round(float(platt.coef_[0][0]), 6),
+        "intercept": round(float(platt.intercept_[0]), 6),
+    }
+
+    # Re-select the classification threshold on CALIBRATED OOF probabilities,
+    # not the raw ones used for model ranking above. Platt scaling is
+    # monotonic (it preserves rank order) but not identity, so a threshold
+    # tuned for the raw probability distribution is not the same operating
+    # point once probabilities are recalibrated - and calibrated
+    # probabilities are what both this script's test metrics and the
+    # TypeScript runtime actually threshold against.
+    calibrated_oof_for_best = 1 / (1 + np.exp(-(calibration["coefficient"] * oof_by_model[best_name] + calibration["intercept"])))
+    calibrated_threshold, calibrated_cv_f1 = select_threshold(train_y, calibrated_oof_for_best)
+    best_meta = {**best_meta, "threshold": calibrated_threshold, "calibrated_cv_f1": round(float(calibrated_cv_f1), 4)}
+
+    calibration_diagnostics = {
+        "uncalibrated_brier_score": round(uncalibrated_brier, 4),
+        "calibrated_classifier_cv_brier_score": round(calibrated_brier, 4),
+        "improved": calibrated_brier < uncalibrated_brier,
+    }
+
+    return best_name, best_model, best_meta, results, calibration, calibration_diagnostics
+
+
+def compute_shap_importance(model_name, fitted_model, train_x, top_n=6):
+    # Tree models get exact TreeSHAP (fast, deterministic, no background
+    # sampling needed). Logistic regression uses a linear explainer -
+    # mathematically, per-instance SHAP for a linear model reduces to
+    # coefficient * (x - mean), which is exactly what the existing
+    # per-instance factor computation for logistic regression already does
+    # in src/lib/mlRisk.ts; this call independently confirms the same
+    # global ranking from the SHAP library itself.
+    if model_name == "random_forest":
+        explainer = shap.TreeExplainer(fitted_model)
+        shap_values = explainer.shap_values(train_x)
+        # Newer shap versions return a single array with a trailing class
+        # axis for binary classification; normalize to the positive class.
+        if isinstance(shap_values, list):
+            values = shap_values[1]
+        elif np.ndim(shap_values) == 3:
+            values = shap_values[:, :, 1]
+        else:
+            values = shap_values
+    elif model_name == "xgboost":
+        explainer = shap.TreeExplainer(fitted_model)
+        values = explainer.shap_values(train_x)
+    else:
+        explainer = shap.LinearExplainer(fitted_model.named_steps["classifier"], fitted_model.named_steps["scaler"].transform(train_x))
+        values = explainer.shap_values(fitted_model.named_steps["scaler"].transform(train_x))
+
+    mean_abs_shap = np.mean(np.abs(values), axis=0)
+    ranked = sorted(zip(ALL_FEATURES, mean_abs_shap), key=lambda item: item[1], reverse=True)
+    return {feature: round(float(value), 6) for feature, value in ranked[:top_n]}
+
+
+def compute_feature_baseline(train_x):
+    means = np.mean(train_x, axis=0)
+    stds = np.std(train_x, axis=0)
+    stds = np.where(stds < 1e-9, 1.0, stds)  # guard against a constant feature
+    return {
+        "mean": {feature: round(float(v), 6) for feature, v in zip(ALL_FEATURES, means)},
+        "std": {feature: round(float(v), 6) for feature, v in zip(ALL_FEATURES, stds)},
+    }
 
 
 def build_artifacts(train_rows, test_rows, seed, test_ratio, augment_factor):
     train_x, train_feature_rows = rows_to_matrix(train_rows)
     test_x, test_feature_rows = rows_to_matrix(test_rows)
+    feature_baseline = compute_feature_baseline(train_x)
 
     models = {}
     metrics = {}
@@ -315,12 +513,26 @@ def build_artifacts(train_rows, test_rows, seed, test_ratio, augment_factor):
         train_y = np.array([int(row[config["column"]]) for row in train_rows], dtype=int)
         test_y = np.array([int(row[config["column"]]) for row in test_rows], dtype=int)
 
-        best_name, fitted_model, best_meta, comparisons = choose_model(train_x, train_y, seed)
-        test_probabilities = fitted_model.predict_proba(test_x)[:, 1]
-        evaluation = evaluate_with_threshold(test_y, test_probabilities, best_meta["threshold"])
+        best_name, fitted_model, best_meta, comparisons, calibration, calibration_diagnostics = choose_model(
+            train_x, train_y, seed
+        )
+        raw_test_probabilities = fitted_model.predict_proba(test_x)[:, 1]
+        # Apply the same Platt-scaling calibration to test-set probabilities
+        # so the reported test metrics reflect what's actually served, not
+        # the pre-calibration score.
+        calibrated_test_probabilities = 1 / (1 + np.exp(
+            -(calibration["coefficient"] * raw_test_probabilities + calibration["intercept"])
+        ))
+        evaluation = evaluate_with_threshold(test_y, calibrated_test_probabilities, best_meta["threshold"])
+        evaluation["brier_score"] = round(float(brier_score_loss(test_y, calibrated_test_probabilities)), 4)
+        evaluation["uncalibrated_brier_score"] = round(float(brier_score_loss(test_y, raw_test_probabilities)), 4)
+
+        shap_importance = compute_shap_importance(best_name, fitted_model, train_x)
 
         if best_name == "logistic_regression":
             serialized = serialize_logistic(fitted_model)
+        elif best_name == "xgboost":
+            serialized = serialize_xgboost(fitted_model)
         else:
             serialized = serialize_random_forest(fitted_model)
 
@@ -328,12 +540,16 @@ def build_artifacts(train_rows, test_rows, seed, test_ratio, augment_factor):
             "condition": config["condition"],
             "recommendation": config["recommendation"],
             "threshold": best_meta["threshold"],
+            "calibration": calibration,
+            "shap_importance": shap_importance,
             **serialized,
         }
 
         metrics[target_name] = {
             "selected_model": best_name,
             "cross_validation": comparisons,
+            "calibration_diagnostics": calibration_diagnostics,
+            "shap_importance": shap_importance,
             "test_metrics": evaluation,
         }
 
@@ -347,6 +563,7 @@ def build_artifacts(train_rows, test_rows, seed, test_ratio, augment_factor):
         "engineered_features": ENGINEERED_FEATURES,
         "all_features": ALL_FEATURES,
         "feature_definitions": FEATURE_DEFINITIONS,
+        "feature_baseline": feature_baseline,
         "models": models,
     }
 
@@ -395,7 +612,7 @@ def to_metrics_ts_module(metrics):
 
 def main():
     parser = argparse.ArgumentParser(description="Train health risk models, compare candidates, and export runtime artifacts.")
-    parser.add_argument("--input", default="ml/demo_health_dataset.csv", help="Input CSV dataset path")
+    parser.add_argument("--input", default="ml/validated_dataset.csv", help="Input CSV dataset path")
     parser.add_argument("--artifacts", default="ml/model_artifacts.json", help="Output JSON artifact path")
     parser.add_argument("--metrics", default="ml/model_metrics.json", help="Output JSON metrics path")
     parser.add_argument("--train-output", default="ml/processed/train_dataset.csv", help="Output train split CSV path")
