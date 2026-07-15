@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MedicalRecord, typeLabels } from '@/lib/mockData';
 import { FileText, Pill, Image, Receipt, ClipboardList, Trash2, Eye, FilePenLine } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMotionPreset } from '@/lib/motion';
 import FileViewer from './FileViewer';
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -28,13 +29,15 @@ interface RecordCardProps {
 export default function RecordCard({ record, onDelete, onEdit, showDetails = false }: RecordCardProps) {
   const Icon = typeIcons[record.type] || FileText;
   const [viewFile, setViewFile] = useState(false);
+  const { fadeInUp } = useMotionPreset();
 
   return (
     <>
       <motion.div
         layout
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
+        variants={fadeInUp}
+        initial="hidden"
+        animate="visible"
         className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow group"
       >
         <div className="flex items-start gap-3">

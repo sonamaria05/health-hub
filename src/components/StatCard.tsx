@@ -1,5 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMotionPreset } from '@/lib/motion';
 
 interface StatCardProps {
   title: string;
@@ -25,9 +26,10 @@ const iconVariants = {
 };
 
 export default function StatCard({ title, value, subtitle, icon: Icon, variant = 'default' }: StatCardProps) {
+  const { hoverLift } = useMotionPreset();
   return (
     <motion.div
-      whileHover={{ y: -2 }}
+      {...hoverLift}
       className={`rounded-xl border p-5 transition-shadow hover:shadow-md ${variantStyles[variant]}`}
     >
       <div className="flex items-start justify-between">
