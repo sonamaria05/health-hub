@@ -123,6 +123,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          analytics_opt_in: boolean
           avatar_url: string | null
           created_at: string
           display_name: string | null
@@ -132,6 +133,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analytics_opt_in?: boolean
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -141,6 +143,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          analytics_opt_in?: boolean
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -229,9 +232,69 @@ export type Database = {
         }
         Relationships: []
       }
+      model_training_runs: {
+        Row: {
+          dataset_size: number
+          metrics_json: Json
+          model_version: string
+          run_id: string
+          target: string
+          trained_at: string
+          trained_by: string
+        }
+        Insert: {
+          dataset_size: number
+          metrics_json: Json
+          model_version: string
+          run_id?: string
+          target: string
+          trained_at?: string
+          trained_by?: string
+        }
+        Update: {
+          dataset_size?: number
+          metrics_json?: Json
+          model_version?: string
+          run_id?: string
+          target?: string
+          trained_at?: string
+          trained_by?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      user_risk_trends: {
+        Row: {
+          user_id: string | null
+          record_id: string
+          date: string | null
+          type: string
+          status: string | null
+          extracted_data: Json | null
+          created_at: string
+        }
+      }
+      population_health_aggregates: {
+        Row: {
+          type: string
+          status: string | null
+          month: string | null
+          record_count: number
+        }
+      }
+      model_performance_over_time: {
+        Row: {
+          target: string
+          model_version: string
+          trained_at: string
+          dataset_size: number
+          selected_model: string | null
+          test_auc: number | null
+          test_f1: number | null
+          test_brier_score: number | null
+        }
+      }
     }
     Functions: {
       has_role: {

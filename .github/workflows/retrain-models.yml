@@ -30,6 +30,13 @@ jobs:
       - name: Retrain models
         run: python scripts/train_risk_models.py
 
+      - name: Log training run to Supabase (best-effort audit trail)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TRAINED_BY: "ci:${{ github.workflow }}"
+        run: python scripts/log_training_run.py
+
       - name: Check for changes
         id: diff
         run: |
