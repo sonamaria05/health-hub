@@ -110,6 +110,7 @@ export default function RecordsPage() {
           <input
             type="text"
             placeholder="Search by title, patient, or doctor..."
+            aria-label="Search records"
             value={search}
             onChange={event => setSearch(event.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

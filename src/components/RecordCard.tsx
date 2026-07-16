@@ -93,6 +93,7 @@ export default function RecordCard({ record, onDelete, onEdit, showDetails = fal
                 onClick={() => onEdit(record)}
                 className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all"
                 title="Edit record"
+                aria-label="Edit record"
               >
                 <FilePenLine className="w-3.5 h-3.5" />
               </button>
@@ -102,6 +103,7 @@ export default function RecordCard({ record, onDelete, onEdit, showDetails = fal
                 onClick={() => setViewFile(true)}
                 className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all"
                 title="View file"
+                aria-label="View file"
               >
                 <Eye className="w-3.5 h-3.5" />
               </button>
@@ -111,6 +113,7 @@ export default function RecordCard({ record, onDelete, onEdit, showDetails = fal
                 onClick={() => onDelete(record.id)}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
                 title="Delete record"
+                aria-label="Delete record"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>

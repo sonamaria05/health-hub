@@ -86,7 +86,7 @@ export default function FileViewer({ filePath, fileName, onClose }: FileViewerPr
                 </a>
               </Button>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted">
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted" aria-label="Close file viewer">
               <X className="w-4 h-4" />
             </button>
           </div>
