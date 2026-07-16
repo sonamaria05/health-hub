@@ -8,6 +8,8 @@ import { RiskCardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { mlMetrics } from '@/lib/generated/mlMetrics';
+import RiskGauge from '@/components/RiskGauge';
+import { useMotionPreset } from '@/lib/motion';
 
 const riskStyles = {
   low: { bg: 'bg-success/10', text: 'text-success', border: 'border-success/20', icon: CheckCircle },
@@ -16,6 +18,7 @@ const riskStyles = {
 };
 
 export default function PredictionsPage() {
+  const { fadeInUp } = useMotionPreset();
   const { records, isDemoData, loading } = useRecords();
   const localPredictions = useMemo(() => predictHealthRisksFromRecords(records), [records]);
   const recordsWithData = records.filter(record => record.extractedData);
@@ -151,38 +154,24 @@ export default function PredictionsPage() {
         <div className="grid gap-4">
           {predictions.map((insight, index) => {
             const style = riskStyles[insight.risk];
-            const RiskIcon = style.icon;
 
             return (
               <motion.div
                 key={insight.condition}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
+                variants={fadeInUp}
+                initial="hidden"
+                animate="visible"
                 transition={{ delay: index * 0.08 }}
                 className={`bg-card border rounded-xl p-5 ${style.border}`}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-xl ${style.bg} shrink-0`}>
-                    <RiskIcon className={`w-5 h-5 ${style.text}`} />
-                  </div>
+                  <RiskGauge probability={insight.probability} risk={insight.risk} delay={index * 0.08} />
                   <div className="flex-1">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="font-heading font-bold">{insight.condition}</h3>
                       <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
                         {insight.risk} risk
                       </span>
-                    </div>
-
-                    <div className="mt-3 flex items-center gap-3">
-                      <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${insight.probability}%` }}
-                          transition={{ duration: 1, delay: index * 0.08 }}
-                          className={`h-full rounded-full ${insight.risk === 'low' ? 'bg-success' : insight.risk === 'moderate' ? 'bg-warning' : 'bg-destructive'}`}
-                        />
-                      </div>
-                      <span className={`text-sm font-bold ${style.text}`}>{insight.probability}%</span>
                     </div>
 
                     <div className="mt-3">
