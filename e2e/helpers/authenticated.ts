@@ -166,6 +166,17 @@ export async function mockAuthenticatedSession(page: Page, roles: string[] = ['p
       return;
     }
 
+    if (url.pathname.endsWith('/rest/v1/prediction_reviews') && route.request().method() === 'GET') {
+      await fulfillJson(route, []);
+      return;
+    }
+
+    if (url.pathname.endsWith('/rest/v1/prediction_reviews') && route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, [{ id: 'review-e2e-1', created_at: new Date().toISOString(), ...body }], 201);
+      return;
+    }
+
     if (url.pathname.endsWith('/functions/v1/predict-health-risks')) {
       await fulfillJson(route, mockPredictions);
       return;

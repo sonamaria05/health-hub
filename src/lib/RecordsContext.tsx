@@ -21,7 +21,7 @@ interface RecordsContextType {
 
 const RecordsContext = createContext<RecordsContextType | undefined>(undefined);
 
-function normalizeRecord(record: MedicalRecordRow): MedicalRecord {
+export function normalizeRecord(record: MedicalRecordRow): MedicalRecord {
   return {
     id: record.id,
     type: record.type as MedicalRecord['type'],

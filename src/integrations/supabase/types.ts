@@ -232,6 +232,45 @@ export type Database = {
         }
         Relationships: []
       }
+      prediction_reviews: {
+        Row: {
+          id: string
+          patient_user_id: string
+          condition: string
+          original_risk_level: string
+          original_probability: number
+          action: string
+          override_risk_level: string | null
+          note: string | null
+          reviewed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          patient_user_id: string
+          condition: string
+          original_risk_level: string
+          original_probability: number
+          action: string
+          override_risk_level?: string | null
+          note?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          patient_user_id?: string
+          condition?: string
+          original_risk_level?: string
+          original_probability?: number
+          action?: string
+          override_risk_level?: string | null
+          note?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       model_training_runs: {
         Row: {
           dataset_size: number
