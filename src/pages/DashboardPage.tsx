@@ -1,7 +1,9 @@
-import { AlertTriangle, BellRing, DollarSign, FileText, Loader2, TrendingUp } from 'lucide-react';
+import { AlertTriangle, BellRing, DollarSign, FileText, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import StatCard from '@/components/StatCard';
 import RecordCard from '@/components/RecordCard';
+import { StatCardSkeleton, RecordRowSkeleton, CardBlockSkeleton } from '@/components/skeletons/PageSkeletons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useRecords } from '@/lib/RecordsContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +30,21 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-8" aria-busy="true" aria-label="Loading dashboard">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-80" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+        <div className="grid lg:grid-cols-[1.3fr_0.7fr] gap-6">
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-32" />
+            {Array.from({ length: 3 }).map((_, i) => <RecordRowSkeleton key={i} />)}
+          </div>
+          <CardBlockSkeleton lines={4} />
+        </div>
       </div>
     );
   }

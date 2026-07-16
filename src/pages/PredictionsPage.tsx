@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Brain, CheckCircle, Info, Loader2, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Brain, CheckCircle, Info, TrendingUp } from 'lucide-react';
 import { useRecords } from '@/lib/RecordsContext';
 import { buildFeatureSnapshot, HealthRiskPrediction, predictHealthRisksFromRecords } from '@/lib/mlRisk';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RiskCardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { mlMetrics } from '@/lib/generated/mlMetrics';
@@ -67,8 +69,12 @@ export default function PredictionsPage() {
 
   if (loading || predictionLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-6" aria-busy="true" aria-label="Loading health insights">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <div className="grid md:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <RiskCardSkeleton key={i} />)}
+        </div>
       </div>
     );
   }

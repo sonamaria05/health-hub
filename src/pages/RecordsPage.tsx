@@ -4,6 +4,8 @@ import { useRecords } from '@/lib/RecordsContext';
 import RecordCard from '@/components/RecordCard';
 import { MedicalRecord, typeLabels } from '@/lib/mockData';
 import { Search, Loader2 } from 'lucide-react';
+import { RecordRowSkeleton } from '@/components/skeletons/PageSkeletons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -82,8 +84,10 @@ export default function RecordsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-4" aria-busy="true" aria-label="Loading records">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-11 w-full rounded-lg" />
+        {Array.from({ length: 5 }).map((_, i) => <RecordRowSkeleton key={i} />)}
       </div>
     );
   }
