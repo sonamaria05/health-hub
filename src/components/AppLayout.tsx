@@ -97,7 +97,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <button
-            onClick={signOut}
+           onClick={() => signOut()}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors w-full"
           >
             <LogOut className="w-3.5 h-3.5" /> Sign Out

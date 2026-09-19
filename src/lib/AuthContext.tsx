@@ -170,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-  };
+  }
 
   return (
     <AuthContext.Provider

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { getErrorMessage } from '@/lib/errorUtils';
-import { Upload, CheckCircle, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle, Loader2, Sparkles, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRecords } from '@/lib/RecordsContext';
 import { MedicalRecord, typeLabels } from '@/lib/mockData';
@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { buildExtractionPayload, canAttemptRemoteExtraction, extractMedicalRecordLocally } from '@/lib/documentProcessing';
 import { buildRecordSummary, deriveRecordStatus, validateUploadFile } from '@/lib/recordUtils';
 import { extractMedicalDataSchema } from '@/lib/schemas/edgeFunctionSchemas';
+import { statusFromRange } from '@/lib/localMedicalExtraction';
 
 type Step = 'upload' | 'scanning' | 'extracted' | 'done';
 
@@ -28,10 +29,67 @@ export default function UploadPage() {
   const [editableRecord, setEditableRecord] = useState<EditableRecord>({});
   const [filePath, setFilePath] = useState('');
   const [error, setError] = useState('');
+  const [showAddParam, setShowAddParam] = useState(false);
+  const [newParamKey, setNewParamKey] = useState('');
+  const [newParamValue, setNewParamValue] = useState('');
+  const [newParamUnit, setNewParamUnit] = useState('mg/dL');
+  const [newParamRange, setNewParamRange] = useState('70-100');
   const { addRecord } = useRecords();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile } = useAuth();
+
+  const handleUpdateParamValue = (key: string, rawVal: string) => {
+    const num = Number(rawVal);
+    setExtractedData((prev) => {
+      if (!prev || !prev[key]) return prev;
+      const current = prev[key];
+      return {
+        ...prev,
+        [key]: {
+          ...current,
+          value: Number.isNaN(num) ? 0 : num,
+          status: statusFromRange(Number.isNaN(num) ? 0 : num, current.normalRange),
+        },
+      };
+    });
+  };
+
+  const handleDeleteParameter = (key: string) => {
+    setExtractedData((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleAddParameter = () => {
+    if (!newParamKey.trim() || !newParamValue.trim()) {
+      toast({ title: 'Missing fields', description: 'Enter both a parameter name and value.', variant: 'destructive' });
+      return;
+    }
+    const num = Number(newParamValue);
+    if (Number.isNaN(num)) {
+      toast({ title: 'Invalid value', description: 'Parameter value must be a number.', variant: 'destructive' });
+      return;
+    }
+    const range = newParamRange.trim() || '0-100';
+    const unit = newParamUnit.trim() || '';
+    setExtractedData((prev) => ({
+      ...(prev || {}),
+      [newParamKey.trim()]: {
+        value: num,
+        unit,
+        normalRange: range,
+        status: statusFromRange(num, range),
+      },
+    }));
+    setNewParamKey('');
+    setNewParamValue('');
+    setShowAddParam(false);
+    toast({ title: 'Marker added', description: `Added ${newParamKey.trim()} to extracted parameters.` });
+  };
 
   const cleanupUploadedFile = useCallback(async (path: string) => {
     const { error: removeError } = await supabase.storage
@@ -377,23 +435,120 @@ export default function UploadPage() {
               <Textarea id="notes" value={editableRecord.notes || ''} onChange={event => setEditableRecord(prev => ({ ...prev, notes: event.target.value }))} placeholder="Add any clinical notes or reminders here." />
             </div>
 
-            {extractedData && Object.keys(extractedData).length > 0 && (
-              <div className="grid gap-3">
-                <h3 className="font-heading font-semibold text-sm">Extracted Parameters</h3>
-                {Object.entries(extractedData).map(([key, data]) => (
-                  <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="font-medium text-sm">{key}</p>
-                      <p className="text-xs text-muted-foreground">Normal: {data.normalRange} {data.unit}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-sm">{data.value} {data.unit}</p>
-                      <p className="text-[10px] uppercase text-muted-foreground">{data.status}</p>
-                    </div>
-                  </div>
-                ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-semibold text-sm">Extracted Lab Parameters</h3>
+                  <p className="text-xs text-muted-foreground">Verify, edit, or add any lab values below.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddParam(!showAddParam)}
+                  className="text-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  {showAddParam ? 'Cancel' : 'Add Parameter'}
+                </Button>
               </div>
-            )}
+
+              {showAddParam && (
+                <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
+                  <p className="text-xs font-semibold text-primary">Add Lab Marker</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <Input
+                      placeholder="Name (e.g. Fasting Glucose)"
+                      value={newParamKey}
+                      onChange={e => setNewParamKey(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Value (e.g. 95)"
+                      value={newParamValue}
+                      onChange={e => setNewParamValue(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <Input
+                      placeholder="Unit (e.g. mg/dL)"
+                      value={newParamUnit}
+                      onChange={e => setNewParamUnit(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                    <Input
+                      placeholder="Range (e.g. 70-100)"
+                      value={newParamRange}
+                      onChange={e => setNewParamRange(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex flex-wrap gap-1">
+                      {['Hemoglobin', 'Fasting Glucose', 'Total Cholesterol', 'Creatinine', 'HbA1c', 'Triglycerides'].map(suggested => (
+                        <button
+                          key={suggested}
+                          type="button"
+                          onClick={() => {
+                            setNewParamKey(suggested);
+                            if (suggested === 'Hemoglobin') { setNewParamUnit('g/dL'); setNewParamRange('12-16'); }
+                            if (suggested === 'Fasting Glucose') { setNewParamUnit('mg/dL'); setNewParamRange('70-100'); }
+                            if (suggested === 'Total Cholesterol') { setNewParamUnit('mg/dL'); setNewParamRange('0-200'); }
+                            if (suggested === 'Creatinine') { setNewParamUnit('mg/dL'); setNewParamRange('0.6-1.2'); }
+                            if (suggested === 'HbA1c') { setNewParamUnit('%'); setNewParamRange('0-5.7'); }
+                            if (suggested === 'Triglycerides') { setNewParamUnit('mg/dL'); setNewParamRange('0-150'); }
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded bg-background border border-border text-muted-foreground hover:text-foreground"
+                        >
+                          + {suggested}
+                        </button>
+                      ))}
+                    </div>
+                    <Button type="button" size="sm" onClick={handleAddParameter} className="h-7 text-xs">
+                      Save Marker
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {extractedData && Object.keys(extractedData).length > 0 ? (
+                <div className="grid gap-2">
+                  {Object.entries(extractedData).map(([key, data]) => (
+                    <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/60">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <p className="font-medium text-sm truncate">{key}</p>
+                        <p className="text-xs text-muted-foreground">Normal: {data.normalRange} {data.unit}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={data.value}
+                            onChange={e => handleUpdateParamValue(key, e.target.value)}
+                            className="w-24 h-8 text-right text-xs font-bold"
+                          />
+                          <p className="text-[10px] uppercase text-muted-foreground mt-0.5">{data.status}</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground min-w-[40px]">{data.unit}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteParameter(key)}
+                          className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
+                          title="Remove marker"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 border border-dashed rounded-xl text-muted-foreground text-xs">
+                  No parameters extracted yet. Click "Add Parameter" above to manually enter lab values.
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-3 pt-2">
               <Button onClick={handleSave} className="flex-1 gradient-primary text-primary-foreground border-0">

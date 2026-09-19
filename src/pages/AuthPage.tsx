@@ -119,7 +119,15 @@ export default function AuthPage() {
         }
       }
     } catch (err: unknown) {
-      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+      const msg = getErrorMessage(err);
+      const isRateLimit = msg.toLowerCase().includes('rate limit');
+      toast({
+        title: isRateLimit ? 'Email Rate Limit Exceeded' : 'Authentication Error',
+        description: isRateLimit
+          ? "Supabase free email limit reached (max 3/hr). In your Supabase Dashboard > Authentication > Providers > Email, toggle OFF 'Confirm email' to allow immediate instant sign-up without rate limits."
+          : msg,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

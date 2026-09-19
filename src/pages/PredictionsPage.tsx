@@ -131,7 +131,9 @@ export default function PredictionsPage() {
           {Object.entries(mlMetrics.per_model).map(([key, value]) => (
             <div key={key} className="rounded-lg border border-border p-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="font-medium text-sm">{value.selected_model === 'random_forest' ? 'Random Forest' : 'Logistic Regression'} for {key}</p>
+                <p className="font-medium text-sm">
+                  {value.selected_model === 'xgboost' ? 'XGBoost' : value.selected_model === 'random_forest' ? 'Random Forest' : 'Logistic Regression'} for {key}
+                </p>
                 <Badge variant="outline">Threshold {value.test_metrics.threshold}</Badge>
               </div>
               <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">

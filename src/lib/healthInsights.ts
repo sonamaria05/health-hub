@@ -18,17 +18,25 @@ export const baseMetrics: MetricDefinition[] = [
   { key: 'triglycerides', label: 'Triglycerides (mg/dL)', color: '#14b8a6', normalMin: 0, normalMax: 150 },
 ];
 
-const keyMapping: Record<string, string> = {
-  Hemoglobin: 'hemoglobin',
-  'Fasting Glucose': 'glucose',
-  Glucose: 'glucose',
-  'Total Cholesterol': 'cholesterol',
-  Cholesterol: 'cholesterol',
-  Creatinine: 'creatinine',
-  HbA1c: 'hba1c',
-  'LDL Cholesterol': 'ldl',
-  Triglycerides: 'triglycerides',
+const metricAliases: Record<string, string[]> = {
+  hemoglobin: ['hemoglobin', 'hb', 'haemoglobin'],
+  glucose: ['fasting glucose', 'glucose', 'blood glucose', 'fasting blood sugar', 'fbs', 'sugar'],
+  cholesterol: ['total cholesterol', 'cholesterol', 'serum cholesterol'],
+  creatinine: ['creatinine', 'serum creatinine', 's. creatinine'],
+  hba1c: ['hba1c', 'hb a1c', 'a1c', 'glycated hemoglobin'],
+  ldl: ['ldl cholesterol', 'ldl', 'serum ldl'],
+  triglycerides: ['triglycerides', 'triglyceride', 'tg'],
 };
+
+function mapMetricKey(rawKey: string): string | undefined {
+  const normalized = rawKey.trim().toLowerCase();
+  for (const [key, aliases] of Object.entries(metricAliases)) {
+    if (aliases.some(alias => normalized === alias || normalized.includes(alias))) {
+      return key;
+    }
+  }
+  return undefined;
+}
 
 function getLatestRecordWithExtractedData(records: MedicalRecord[]) {
   return [...records]
@@ -46,8 +54,8 @@ export function buildChartData(records: MedicalRecord[]) {
       };
 
       for (const [key, value] of Object.entries(record.extractedData ?? {})) {
-        const mappedKey = keyMapping[key];
-        if (mappedKey) {
+        const mappedKey = mapMetricKey(key);
+        if (mappedKey && value?.value != null) {
           point[mappedKey] = value.value;
         }
       }

@@ -73,8 +73,19 @@ function parseNormalRange(fragment: string, fallback: string) {
   return rangeMatch?.[1]?.replace(/\s+/g, '') ?? fallback;
 }
 
-function statusFromRange(value: number, normalRange: string): ExtractedMetric['status'] {
-  const match = normalRange.match(/(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)/);
+export function statusFromRange(value: number, normalRange: string): ExtractedMetric['status'] {
+  const cleanRange = normalRange.trim();
+  const lessThanMatch = cleanRange.match(/^[<≤]\s*(\d+(?:\.\d+)?)/);
+  if (lessThanMatch) {
+    const max = Number(lessThanMatch[1]);
+    return value > max ? 'high' : 'normal';
+  }
+  const greaterThanMatch = cleanRange.match(/^[>≥]\s*(\d+(?:\.\d+)?)/);
+  if (greaterThanMatch) {
+    const min = Number(greaterThanMatch[1]);
+    return value < min ? 'low' : 'normal';
+  }
+  const match = cleanRange.match(/(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)/);
   if (!match) return 'normal';
   const min = Number(match[1]);
   const max = Number(match[2]);

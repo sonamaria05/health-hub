@@ -67,12 +67,13 @@ function toRiskLevel(probability: number, threshold: number): RiskLevel {
 
 function getLatestMetricValue(records: RecordLike[], aliases: readonly string[]) {
   const sortedRecords = [...records].sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
+  const normalizedAliases = aliases.map((a) => a.toLowerCase().trim());
 
   for (let index = sortedRecords.length - 1; index >= 0; index -= 1) {
     const extractedData = sortedRecords[index].extractedData ?? {};
-    for (const alias of aliases) {
-      const metric = extractedData[alias];
-      if (metric?.value != null) {
+    for (const [key, metric] of Object.entries(extractedData)) {
+      const normalizedKey = key.toLowerCase().trim();
+      if (metric?.value != null && (normalizedAliases.includes(normalizedKey) || normalizedAliases.some(a => normalizedKey.includes(a) || a.includes(normalizedKey)))) {
         return metric.value;
       }
     }
