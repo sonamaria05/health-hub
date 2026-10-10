@@ -20,7 +20,7 @@ interface MetricRule {
 
 const metricRules: Record<string, MetricRule> = {
   Hemoglobin: {
-    aliases: ['hemoglobin', 'hb'],
+    aliases: ['hemoglobin', 'hb', 'hgb', 'haemoglobin'],
     plausibleMin: 2,
     plausibleMax: 25,
     criticalLow: 7,
@@ -28,7 +28,7 @@ const metricRules: Record<string, MetricRule> = {
     preferredUnit: 'g/dL',
   },
   'Fasting Glucose': {
-    aliases: ['fasting glucose', 'glucose', 'blood glucose', 'sugar'],
+    aliases: ['fasting glucose', 'glucose', 'blood glucose', 'sugar', 'fasting blood sugar'],
     plausibleMin: 20,
     plausibleMax: 700,
     criticalLow: 50,
@@ -103,38 +103,88 @@ const metricRules: Record<string, MetricRule> = {
     preferredUnit: '%',
   },
   WBC: {
-    aliases: ['wbc', 'white blood cells', 'white blood cell count'],
+    aliases: ['total w.b.c', 'total wbc', 'w.b.c', 'wbc', 'white blood cells', 'total leukocyte count'],
     plausibleMin: 0.5,
-    plausibleMax: 100,
-    criticalLow: 2,
-    criticalHigh: 30,
-    preferredUnit: '10^3/uL',
+    plausibleMax: 150000,
+    preferredUnit: 'cells/cumm',
   },
   Platelets: {
-    aliases: ['platelets', 'platelet count'],
-    plausibleMin: 5,
-    plausibleMax: 1500,
-    criticalLow: 50,
-    criticalHigh: 1000,
-    preferredUnit: '10^3/uL',
+    aliases: ['platelet count', 'total platelet count', 'platelets'],
+    plausibleMin: 0.1,
+    plausibleMax: 2000,
+    preferredUnit: 'Lakhs/cumm',
   },
   RBC: {
-    aliases: ['rbc', 'red blood cells', 'red blood cell count'],
+    aliases: ['total r.b.c', 'total rbc', 'r.b.c', 'rbc', 'red blood cells'],
     plausibleMin: 1,
     plausibleMax: 9,
     criticalLow: 2.5,
     criticalHigh: 7,
-    preferredUnit: '10^6/uL',
+    preferredUnit: 'mill/cumm',
+  },
+  Neutrophils: {
+    aliases: ['neutrophils', 'neutrophil'],
+    plausibleMin: 0,
+    plausibleMax: 100,
+    preferredUnit: '%',
+  },
+  Lymphocytes: {
+    aliases: ['lymphocytes', 'lymphocyte'],
+    plausibleMin: 0,
+    plausibleMax: 100,
+    preferredUnit: '%',
+  },
+  Eosinophils: {
+    aliases: ['eosinophils', 'eosinophil'],
+    plausibleMin: 0,
+    plausibleMax: 100,
+    preferredUnit: '%',
+  },
+  Monocytes: {
+    aliases: ['monocytes', 'monocyte'],
+    plausibleMin: 0,
+    plausibleMax: 100,
+    preferredUnit: '%',
+  },
+  Basophils: {
+    aliases: ['basophils', 'basophil'],
+    plausibleMin: 0,
+    plausibleMax: 100,
+    preferredUnit: '%',
+  },
+  PCV: {
+    aliases: ['p.c.v', 'p.cv', 'pcv', 'packed cell volume', 'hematocrit'],
+    plausibleMin: 10,
+    plausibleMax: 75,
+    preferredUnit: '%',
+  },
+  MCV: {
+    aliases: ['m.c.v', 'm.cv', 'mcv'],
+    plausibleMin: 40,
+    plausibleMax: 140,
+    preferredUnit: 'fl',
+  },
+  MCH: {
+    aliases: ['m.c.h', 'm.ch', 'mch'],
+    plausibleMin: 10,
+    plausibleMax: 50,
+    preferredUnit: 'pg',
+  },
+  MCHC: {
+    aliases: ['m.c.h.c', 'm.ch.c', 'mchc'],
+    plausibleMin: 20,
+    plausibleMax: 50,
+    preferredUnit: '%',
   },
   Urea: {
-    aliases: ['urea', 'blood urea'],
+    aliases: ['urea', 'blood urea', 'bun', 'blood urea nitrogen'],
     plausibleMin: 2,
     plausibleMax: 250,
     criticalHigh: 100,
     preferredUnit: 'mg/dL',
   },
   Bilirubin: {
-    aliases: ['bilirubin', 'total bilirubin'],
+    aliases: ['bilirubin', 'total bilirubin', 'serum bilirubin'],
     plausibleMin: 0,
     plausibleMax: 40,
     criticalHigh: 10,
@@ -171,13 +221,22 @@ export function canonicalMetricName(value: string) {
   ))?.[0];
 }
 
-function parseRange(normalRange: string) {
-  const match = normalRange.match(/(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)/);
-  if (!match) return null;
-  return {
-    min: Number(match[1]),
-    max: Number(match[2]),
-  };
+function parseRange(normalRange: string): { min: number; max: number } | null {
+  if (!normalRange || normalRange === 'N/A') return null;
+
+  // Standard: "12-16" or "12.5 - 16.0"
+  const rangeMatch = normalRange.match(/(-?[\d.]+)\s*[-–]\s*(-?[\d.]+)/);
+  if (rangeMatch) return { min: Number(rangeMatch[1]), max: Number(rangeMatch[2]) };
+
+  // Greater than: ">4000" or ">= 4000"
+  const gtMatch = normalRange.match(/>=?\s*([\d.]+)/);
+  if (gtMatch) return { min: Number(gtMatch[1]), max: 999999999 };
+
+  // Less than: "<0.5" or "<= 0.5"
+  const ltMatch = normalRange.match(/<=?\s*([\d.]+)/);
+  if (ltMatch) return { min: -999999999, max: Number(ltMatch[1]) };
+
+  return null;
 }
 
 function statusFromRange(value: number, normalRange: string): ExtractedMetric['status'] {
@@ -218,19 +277,20 @@ export function normalizeExtractedData(extractedData?: MedicalRecord['extractedD
     }
 
     const normalRange = metric.normalRange || 'N/A';
-    const nextMetric: ExtractedMetric = {
-      value,
-      unit,
-      normalRange,
-      status: statusFromRange(value, normalRange),
-    };
+    const derivedStatus = statusFromRange(value, normalRange);
+
+    // Carry through AI-generated confidence and needs_review flags
+    let needsReviewFlag = metric.needs_review;
+    const confidence    = metric.confidence;
 
     if (rule && (value < rule.plausibleMin || value > rule.plausibleMax)) {
       issues.push({
         metric: canonical,
         severity: 'critical',
-        message: `${canonical} value ${value} ${unit} is outside plausible human limits and should be manually reviewed.`,
+        message: `${canonical} value ${value} ${unit} is outside plausible human limits.`,
       });
+      // Force needs_review for physiologically impossible values
+      needsReviewFlag = true;
     } else if (
       rule &&
       ((rule.criticalLow != null && value < rule.criticalLow) || (rule.criticalHigh != null && value > rule.criticalHigh))
@@ -238,21 +298,31 @@ export function normalizeExtractedData(extractedData?: MedicalRecord['extractedD
       issues.push({
         metric: canonical,
         severity: 'critical',
-        message: `${canonical} value ${value} ${unit} crosses a critical review threshold.`,
+        message: `${canonical} value ${value} ${unit} crosses a critical threshold.`,
       });
-    } else if (metric.status !== nextMetric.status) {
+    } else if (metric.status !== derivedStatus) {
       issues.push({
         metric: canonical,
         severity: 'warning',
-        message: `${canonical} status was recalculated from ${metric.status} to ${nextMetric.status}.`,
+        message: `${canonical} status recalculated from ${metric.status} to ${derivedStatus}.`,
       });
     }
+
+    const nextMetric: ExtractedMetric = {
+      value,
+      unit,
+      normalRange,
+      status:      derivedStatus,
+      confidence,                                        // ← PRESERVED
+      needs_review: needsReviewFlag || undefined,        // ← PRESERVED + physiological flag
+    };
 
     normalized[canonical] = nextMetric;
   }
 
   return { extractedData: normalized, issues };
 }
+
 
 export function hasCriticalValidationIssue(issues: MetricValidationIssue[]) {
   return issues.some((issue) => issue.severity === 'critical');

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getErrorMessage } from '@/lib/errorUtils';
-import { BellPlus, Loader2, LogOut, MailCheck, Monitor, Moon, ShieldCheck, Sun, Trash2, UserRound } from 'lucide-react';
+import { BarChart3, Bell, BellPlus, Loader2, LogOut, MailCheck, Monitor, Moon, ShieldCheck, Sun, Trash2, UserRound } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useReminders } from '@/lib/RemindersContext';
 import MfaEnrollment from '@/components/MfaEnrollment';
 import MyActivity from '@/components/MyActivity';
@@ -24,11 +25,16 @@ export default function SettingsPage() {
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderTime, setReminderTime] = useState('');
   const [reminderNotes, setReminderNotes] = useState('');
+  const [notifAbnormalResults, setNotifAbnormalResults] = useState(() => localStorage.getItem('healytics_notif_abnormal') !== 'false');
+  const [notifUploadConfirm, setNotifUploadConfirm] = useState(() => localStorage.getItem('healytics_notif_upload') !== 'false');
+  const [notifReminders, setNotifReminders] = useState(() => localStorage.getItem('healytics_notif_reminders') !== 'false');
+  const [analyticsOptIn, setAnalyticsOptIn] = useState(profile?.analytics_opt_in ?? false);
   const { toast } = useToast();
 
   useEffect(() => {
     setDisplayName(profile?.display_name ?? '');
-  }, [profile?.display_name]);
+    setAnalyticsOptIn(profile?.analytics_opt_in ?? false);
+  }, [profile?.display_name, profile?.analytics_opt_in]);
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -164,6 +170,63 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground mt-1">Lower-light viewing mode.</p>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              <h2 className="font-heading font-semibold">Notification Preferences</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">Choose which in-app notifications you receive.</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="notif-abnormal">Abnormal results alerts</Label>
+                  <p className="text-xs text-muted-foreground">Get notified when extraction flags out-of-range values.</p>
+                </div>
+                <Switch id="notif-abnormal" checked={notifAbnormalResults} onCheckedChange={v => { setNotifAbnormalResults(v); localStorage.setItem('healytics_notif_abnormal', String(v)); }} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="notif-upload">Upload confirmations</Label>
+                  <p className="text-xs text-muted-foreground">Show a notification after each successful upload.</p>
+                </div>
+                <Switch id="notif-upload" checked={notifUploadConfirm} onCheckedChange={v => { setNotifUploadConfirm(v); localStorage.setItem('healytics_notif_upload', String(v)); }} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="notif-reminders">Reminder alerts</Label>
+                  <p className="text-xs text-muted-foreground">Receive alerts when a health reminder is due.</p>
+                </div>
+                <Switch id="notif-reminders" checked={notifReminders} onCheckedChange={v => { setNotifReminders(v); localStorage.setItem('healytics_notif_reminders', String(v)); }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              <h2 className="font-heading font-semibold">Analytics</h2>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="analytics-opt-in">Usage analytics</Label>
+                <p className="text-xs text-muted-foreground">Help improve Healytics by sharing anonymous usage data. No medical data is ever shared.</p>
+              </div>
+              <Switch
+                id="analytics-opt-in"
+                checked={analyticsOptIn}
+                onCheckedChange={async (v) => {
+                  setAnalyticsOptIn(v);
+                  try {
+                    await updateProfile({ analytics_opt_in: v });
+                  } catch {
+                    setAnalyticsOptIn(!v);
+                    toast({ title: 'Could not update preference', variant: 'destructive' });
+                  }
+                }}
+              />
             </div>
           </div>
 

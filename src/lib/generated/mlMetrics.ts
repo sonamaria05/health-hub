@@ -3,239 +3,239 @@
 export const mlMetrics = {
   "model_version": "3.0.0",
   "dataset": {
-    "seed_rows": 500,
+    "seed_rows": 400,
     "train_rows": 375,
-    "test_rows": 125,
+    "test_rows": 25,
     "test_ratio": 0.25,
     "augmentation_factor": 4,
     "seed": 42
   },
   "per_model": {
     "anemia": {
-      "selected_model": "xgboost",
+      "selected_model": "random_forest",
       "cross_validation": {
         "logistic_regression": {
-          "threshold": 0.45,
-          "cv_f1": 0.7395,
-          "cv_auc": 0.8178,
-          "blended_score": 0.7786
+          "threshold": 0.25,
+          "cv_f1": 0.9908,
+          "cv_auc": 0.9908,
+          "blended_score": 0.9908
         },
         "random_forest": {
-          "threshold": 0.5,
-          "cv_f1": 0.8274,
-          "cv_auc": 0.8935,
-          "blended_score": 0.8604
+          "threshold": 0.375,
+          "cv_f1": 0.9879,
+          "cv_auc": 0.9953,
+          "blended_score": 0.9916
         },
         "xgboost": {
-          "threshold": 0.425,
-          "cv_f1": 0.8427,
-          "cv_auc": 0.9166,
-          "blended_score": 0.8796
+          "threshold": 0.25,
+          "cv_f1": 0.974,
+          "cv_auc": 0.9873,
+          "blended_score": 0.9807
         }
       },
       "calibration_diagnostics": {
-        "uncalibrated_brier_score": 0.1118,
-        "calibrated_classifier_cv_brier_score": 0.1244,
+        "uncalibrated_brier_score": 0.0184,
+        "calibrated_classifier_cv_brier_score": 0.0188,
         "improved": false
       },
       "shap_importance": {
-        "hemoglobin": 1.063372,
-        "renal_load": 0.709175,
-        "lipid_density": 0.626876,
-        "triglycerides": 0.562656,
-        "creatinine": 0.47416,
-        "ldl_cholesterol": 0.333608
+        "hemoglobin": 0.1766,
+        "anemia_signal": 0.17101,
+        "fasting_glucose": 0.053003,
+        "abnormal_ratio": 0.021063,
+        "risk_burden": 0.019706,
+        "lipid_density": 0.014206
       },
       "test_metrics": {
-        "sample_count": 125,
-        "positive_count": 62,
-        "negative_count": 63,
-        "accuracy": 0.808,
-        "precision": 0.7879,
-        "recall": 0.8387,
-        "f1": 0.8125,
-        "auc": 0.8889,
-        "threshold": 0.4,
+        "sample_count": 25,
+        "positive_count": 22,
+        "negative_count": 3,
+        "accuracy": 0.96,
+        "precision": 0.9565,
+        "recall": 1.0,
+        "f1": 0.9778,
+        "auc": 1.0,
+        "threshold": 0.55,
         "confusion_matrix": {
-          "tp": 52,
-          "fp": 14,
-          "tn": 49,
-          "fn": 10
+          "tp": 22,
+          "fp": 1,
+          "tn": 2,
+          "fn": 0
         },
-        "brier_score": 0.1306,
-        "uncalibrated_brier_score": 0.132
+        "brier_score": 0.037,
+        "uncalibrated_brier_score": 0.0222
       }
     },
     "diabetes": {
-      "selected_model": "xgboost",
+      "selected_model": "random_forest",
       "cross_validation": {
         "logistic_regression": {
-          "threshold": 0.35,
-          "cv_f1": 0.6395,
-          "cv_auc": 0.801,
-          "blended_score": 0.7203
+          "threshold": 0.25,
+          "cv_f1": 0.9935,
+          "cv_auc": 0.9894,
+          "blended_score": 0.9915
         },
         "random_forest": {
-          "threshold": 0.425,
-          "cv_f1": 0.8071,
-          "cv_auc": 0.9424,
-          "blended_score": 0.8748
+          "threshold": 0.475,
+          "cv_f1": 1.0,
+          "cv_auc": 1.0,
+          "blended_score": 1.0
         },
         "xgboost": {
-          "threshold": 0.375,
-          "cv_f1": 0.8633,
-          "cv_auc": 0.957,
-          "blended_score": 0.9102
+          "threshold": 0.475,
+          "cv_f1": 0.9968,
+          "cv_auc": 0.9998,
+          "blended_score": 0.9983
         }
       },
       "calibration_diagnostics": {
-        "uncalibrated_brier_score": 0.0802,
-        "calibrated_classifier_cv_brier_score": 0.1049,
+        "uncalibrated_brier_score": 0.003,
+        "calibrated_classifier_cv_brier_score": 0.0033,
         "improved": false
       },
       "shap_importance": {
-        "hba1c": 0.931696,
-        "glucose_hba1c_interaction": 0.615418,
-        "glycemic_signal": 0.578514,
-        "fasting_glucose": 0.526533,
-        "hemoglobin": 0.474654,
-        "abnormal_ratio": 0.457884
+        "glycemic_signal": 0.188338,
+        "hba1c": 0.181421,
+        "glucose_hba1c_interaction": 0.058439,
+        "fasting_glucose": 0.024599,
+        "hemoglobin": 0.016193,
+        "anemia_signal": 0.014696
       },
       "test_metrics": {
-        "sample_count": 125,
-        "positive_count": 44,
-        "negative_count": 81,
-        "accuracy": 0.896,
-        "precision": 0.8039,
-        "recall": 0.9318,
-        "f1": 0.8632,
-        "auc": 0.9745,
-        "threshold": 0.3,
+        "sample_count": 25,
+        "positive_count": 19,
+        "negative_count": 6,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "auc": 1.0,
+        "threshold": 0.6,
         "confusion_matrix": {
-          "tp": 41,
-          "fp": 10,
-          "tn": 71,
-          "fn": 3
+          "tp": 19,
+          "fp": 0,
+          "tn": 6,
+          "fn": 0
         },
-        "brier_score": 0.0583,
-        "uncalibrated_brier_score": 0.0612
+        "brier_score": 0.0161,
+        "uncalibrated_brier_score": 0.018
       }
     },
     "cardiovascular": {
       "selected_model": "xgboost",
       "cross_validation": {
         "logistic_regression": {
-          "threshold": 0.25,
-          "cv_f1": 0.8827,
-          "cv_auc": 0.8464,
-          "blended_score": 0.8646
+          "threshold": 0.375,
+          "cv_f1": 0.8705,
+          "cv_auc": 0.8571,
+          "blended_score": 0.8638
         },
         "random_forest": {
           "threshold": 0.4,
-          "cv_f1": 0.9256,
-          "cv_auc": 0.9205,
-          "blended_score": 0.923
+          "cv_f1": 0.9498,
+          "cv_auc": 0.9527,
+          "blended_score": 0.9512
         },
         "xgboost": {
-          "threshold": 0.3,
-          "cv_f1": 0.9355,
-          "cv_auc": 0.9282,
-          "blended_score": 0.9318
+          "threshold": 0.525,
+          "cv_f1": 0.9535,
+          "cv_auc": 0.9607,
+          "blended_score": 0.9571
         }
       },
       "calibration_diagnostics": {
-        "uncalibrated_brier_score": 0.0861,
-        "calibrated_classifier_cv_brier_score": 0.0967,
+        "uncalibrated_brier_score": 0.0633,
+        "calibrated_classifier_cv_brier_score": 0.1148,
         "improved": false
       },
       "shap_importance": {
-        "hemoglobin": 1.044954,
-        "risk_burden": 0.988627,
-        "creatinine": 0.691811,
-        "abnormal_ratio": 0.407447,
-        "fasting_glucose": 0.336934,
-        "renal_load": 0.28593
+        "hemoglobin": 1.217971,
+        "creatinine": 0.768073,
+        "risk_burden": 0.480285,
+        "renal_load": 0.420821,
+        "abnormal_ratio": 0.404872,
+        "hba1c": 0.334235
       },
       "test_metrics": {
-        "sample_count": 125,
-        "positive_count": 102,
-        "negative_count": 23,
-        "accuracy": 0.928,
-        "precision": 0.9346,
-        "recall": 0.9804,
-        "f1": 0.9569,
-        "auc": 0.9659,
-        "threshold": 0.425,
+        "sample_count": 25,
+        "positive_count": 20,
+        "negative_count": 5,
+        "accuracy": 0.72,
+        "precision": 0.8421,
+        "recall": 0.8,
+        "f1": 0.8205,
+        "auc": 0.68,
+        "threshold": 0.65,
         "confusion_matrix": {
-          "tp": 100,
-          "fp": 7,
-          "tn": 16,
-          "fn": 2
+          "tp": 16,
+          "fp": 3,
+          "tn": 2,
+          "fn": 4
         },
-        "brier_score": 0.0585,
-        "uncalibrated_brier_score": 0.0641
+        "brier_score": 0.2045,
+        "uncalibrated_brier_score": 0.2156
       }
     },
     "kidney": {
       "selected_model": "xgboost",
       "cross_validation": {
         "logistic_regression": {
-          "threshold": 0.4,
-          "cv_f1": 0.8497,
-          "cv_auc": 0.926,
-          "blended_score": 0.8879
+          "threshold": 0.625,
+          "cv_f1": 0.9073,
+          "cv_auc": 0.9715,
+          "blended_score": 0.9394
         },
         "random_forest": {
-          "threshold": 0.45,
-          "cv_f1": 0.9164,
-          "cv_auc": 0.9648,
-          "blended_score": 0.9406
+          "threshold": 0.5,
+          "cv_f1": 0.9581,
+          "cv_auc": 0.991,
+          "blended_score": 0.9746
         },
         "xgboost": {
-          "threshold": 0.425,
-          "cv_f1": 0.9373,
-          "cv_auc": 0.9776,
-          "blended_score": 0.9574
+          "threshold": 0.325,
+          "cv_f1": 0.9677,
+          "cv_auc": 0.9936,
+          "blended_score": 0.9807
         }
       },
       "calibration_diagnostics": {
-        "uncalibrated_brier_score": 0.0451,
-        "calibrated_classifier_cv_brier_score": 0.0492,
+        "uncalibrated_brier_score": 0.0256,
+        "calibrated_classifier_cv_brier_score": 0.0446,
         "improved": false
       },
       "shap_importance": {
-        "creatinine": 2.119555,
-        "renal_load": 0.893939,
-        "fasting_glucose": 0.723452,
-        "hemoglobin": 0.517587,
-        "risk_burden": 0.47414,
-        "hba1c": 0.473056
+        "creatinine": 2.877139,
+        "renal_load": 1.142826,
+        "hemoglobin": 0.662141,
+        "glycemic_signal": 0.500661,
+        "glucose_hba1c_interaction": 0.472228,
+        "abnormal_ratio": 0.464821
       },
       "test_metrics": {
-        "sample_count": 125,
-        "positive_count": 54,
-        "negative_count": 71,
-        "accuracy": 0.888,
-        "precision": 0.8571,
-        "recall": 0.8889,
-        "f1": 0.8727,
-        "auc": 0.9528,
-        "threshold": 0.35,
+        "sample_count": 25,
+        "positive_count": 9,
+        "negative_count": 16,
+        "accuracy": 0.76,
+        "precision": 0.6667,
+        "recall": 0.6667,
+        "f1": 0.6667,
+        "auc": 0.7153,
+        "threshold": 0.275,
         "confusion_matrix": {
-          "tp": 48,
-          "fp": 8,
-          "tn": 63,
-          "fn": 6
+          "tp": 6,
+          "fp": 3,
+          "tn": 13,
+          "fn": 3
         },
-        "brier_score": 0.1,
-        "uncalibrated_brier_score": 0.0967
+        "brier_score": 0.2166,
+        "uncalibrated_brier_score": 0.2227
       }
     }
   },
   "summary": {
-    "average_accuracy": 0.88,
-    "average_f1": 0.8763,
-    "average_auc": 0.9455
+    "average_accuracy": 0.86,
+    "average_f1": 0.8662,
+    "average_auc": 0.8488
   }
 } as const;
 

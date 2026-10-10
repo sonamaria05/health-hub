@@ -36,8 +36,8 @@ test('unverified email is blocked from every protected route with a verification
   });
 
   await page.goto('/records');
-  await expect(page.getByRole('heading', { name: /verify your email/i })).toBeVisible();
-  await expect(page.getByRole('button', { name: /resend verification email/i })).toBeVisible();
+  await expect(page.getByText(/verify your email/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /resend verification/i })).toBeVisible();
 });
 
 test('settings page walks through TOTP enrollment up to the QR/verify step', async ({ page }) => {

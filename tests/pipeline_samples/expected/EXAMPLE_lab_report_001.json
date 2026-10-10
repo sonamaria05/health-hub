@@ -1,0 +1,16 @@
+{
+  "_note": "DELETE THIS FILE before running tests. This is just an example of the expected JSON format.",
+  "type": "blood_test",
+  "title": "Complete Blood Count (CBC)",
+  "date": "2026-08-05",
+  "doctor": "Dr. Rajesh Kumar",
+  "hospital": "Koppa Diagnostic Centre",
+  "patientName": "Sonam Sharma",
+  "extractedData": {
+    "Hemoglobin": { "value": 12.5, "unit": "g/dL",         "normalRange": "12-16",   "status": "normal" },
+    "WBC":        { "value": 10300, "unit": "cells/cumm",   "normalRange": "4000-11000", "status": "normal" },
+    "Platelets":  { "value": 2.83,  "unit": "Lakhs/cumm",  "normalRange": "1.5-4.5", "status": "normal" },
+    "PCV":        { "value": 35.7,  "unit": "%",            "normalRange": "37-54",   "status": "low" },
+    "MCV":        { "value": 85.0,  "unit": "fl",           "normalRange": "80-100",  "status": "normal" }
+  }
+}

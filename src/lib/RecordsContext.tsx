@@ -31,7 +31,10 @@ export function normalizeRecord(record: MedicalRecordRow): MedicalRecord {
     hospital: record.hospital,
     patientName: record.patient_name ?? undefined,
     status: record.status as MedicalRecord['status'],
-    extractedData: record.extracted_data ?? undefined,
+    extractedData: (record.extracted_data as any) ?? undefined,
+    medications: (record.medications as any) ?? undefined,
+    billItems: (record.bill_items as any) ?? undefined,
+    billSummary: (record.bill_summary as any) ?? undefined,
     fileName: record.file_name,
     filePath: record.file_path ?? undefined,
     amount: record.amount ? Number(record.amount) : undefined,
@@ -53,7 +56,10 @@ function buildPersistedRecord(record: MedicalRecord, userId: string) {
     patient_name: record.patientName || null,
     status: record.status,
     extracted_data: record.extractedData || null,
-    file_name: record.fileName,
+    medications: record.medications || null,
+    bill_items: record.billItems || null,
+    bill_summary: record.billSummary || null,
+    file_name: record.fileName || record.title || 'Medical Report',
     file_path: record.filePath || null,
     amount: record.amount || null,
     summary: record.summary || buildRecordSummary(record),
@@ -218,8 +224,10 @@ export function RecordsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [dbRecords, user]);
 
-  const isDemoData = demoDataEnabled && dbRecords.length === 0;
-  const records = isDemoData ? mockRecords : dbRecords;
+  const isDemoData = demoDataEnabled;
+  const records = isDemoData 
+    ? [...dbRecords, ...mockRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    : dbRecords;
 
   return (
     <RecordsContext.Provider value={{ records, isDemoData, addRecord, updateRecord, deleteRecord, loading, refetch: fetchRecords }}>

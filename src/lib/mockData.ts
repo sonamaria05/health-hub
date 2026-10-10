@@ -1,3 +1,26 @@
+export interface Medication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+}
+
+export interface BillItem {
+  description: string;
+  category?: string;
+  amount: number;
+  cptCode?: string;
+  icdCode?: string;
+}
+
+export interface BillSummary {
+  totalBilled: number;
+  insuranceCovered?: number;
+  patientResponsibility?: number;
+  discount?: number;
+}
+
 export interface MedicalRecord {
   id: string;
   type: 'blood_test' | 'prescription' | 'imaging' | 'bill' | 'discharge_summary';
@@ -7,7 +30,17 @@ export interface MedicalRecord {
   hospital: string;
   patientName?: string;
   status: 'normal' | 'attention' | 'critical';
-  extractedData?: Record<string, { value: number; unit: string; normalRange: string; status: 'normal' | 'high' | 'low' }>;
+  extractedData?: Record<string, {
+    value: number;
+    unit: string;
+    normalRange: string;
+    status: 'normal' | 'high' | 'low';
+    confidence?: number;
+    needs_review?: boolean;
+  }>;
+  medications?: Medication[];
+  billItems?: BillItem[];
+  billSummary?: BillSummary;
   amount?: number;
   fileName: string;
   filePath?: string;

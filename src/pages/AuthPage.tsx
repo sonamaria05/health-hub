@@ -152,7 +152,7 @@ export default function AuthPage() {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <img src="/favicon.svg" alt="Healytics logo" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
+          <img src="/icon.png" alt="Healytics logo" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
           <h1 className="text-3xl font-heading font-bold gradient-text">Healytics</h1>
           <p className="text-muted-foreground mt-2 text-sm">
             {mfaChallengeId ? 'Enter the 6-digit code from your authenticator app' :
@@ -260,19 +260,25 @@ export default function AuthPage() {
               </button>
             )}
 
+            {mode === 'forgot' && (
+              <button type="button" onClick={() => setMode('login')} className="text-xs text-muted-foreground hover:text-foreground">
+                ← Back to sign in
+              </button>
+            )}
+
             <Button type="submit" className="w-full gradient-primary text-primary-foreground border-0 h-11" disabled={loading}>
               {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground">
+          <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
             {mode === 'login' ? (
-              <>Don't have an account? <button onClick={() => setMode('signup')} className="text-primary font-medium hover:underline">Sign up</button></>
+              <span>Don't have an account? <button type="button" onClick={() => setMode('signup')} className="text-primary font-medium hover:underline">Sign up</button></span>
             ) : (
-              <>Already have an account? <button onClick={() => setMode('login')} className="text-primary font-medium hover:underline">Sign in</button></>
+              <span>Already have an account? <button type="button" onClick={() => setMode('login')} className="text-primary font-medium hover:underline">Sign in</button></span>
             )}
-          </p>
+          </div>
         </div>
         )}
       </motion.div>

@@ -19,6 +19,10 @@ export function validateUploadFile(file: File) {
     return 'Upload a PDF, image, text export, CSV, JSON, DOC, or DOCX medical document.';
   }
 
+  if (file.size === 0) {
+    return 'File appears to be empty.';
+  }
+
   if (file.size > maxUploadSizeBytes) {
     return 'File size must be 20MB or smaller.';
   }

@@ -157,30 +157,40 @@ def determine_abnormal_ratio(values):
 
 def build_row(subject_id, patients, latest, encounter_counts, medians, diagnosis_flags, label_mode):
     values = {}
+    is_imputed = {}
     latest_date = None
 
     for feature in FEATURE_ORDER:
         entry = latest.get((subject_id, feature))
         if entry is not None:
             values[feature] = entry["value"]
+            is_imputed[feature] = 0
             if entry["charttime"] and (latest_date is None or entry["charttime"] > latest_date):
                 latest_date = entry["charttime"]
         else:
             values[feature] = float(medians[feature])
+            is_imputed[feature] = 1
 
     abnormal_ratio = determine_abnormal_ratio(values)
     record_count = max(len(encounter_counts.get(subject_id, set())), 1)
     encounter_date = latest_date.strftime("%Y-%m-%d") if latest_date else f"{patients[subject_id]['anchor_year']}-01-01"
 
     threshold_labels = {
-        "anemia_label": int(values["hemoglobin"] < 12.0),
-        "diabetes_label": int(values["fasting_glucose"] > 100.0 or values["hba1c"] > 5.7),
-        "cardiovascular_label": int(
-            values["total_cholesterol"] > 200.0
-            or values["ldl_cholesterol"] > 100.0
-            or values["triglycerides"] > 150.0
+        # WHO: <12 female, <13 male; 13.0 is conservative unisex
+        "anemia_label": int(not is_imputed["hemoglobin"] and values["hemoglobin"] < 13.0),
+        # ADA/WHO Diabetes: fasting >= 126 or HbA1c >= 6.5 (5.7-6.4 is pre-diabetes)
+        "diabetes_label": int(
+            (not is_imputed["fasting_glucose"] and values["fasting_glucose"] >= 126.0) or 
+            (not is_imputed["hba1c"] and values["hba1c"] >= 6.5)
         ),
-        "kidney_label": int(values["creatinine"] > 1.2),
+        # AHA high-risk thresholds
+        "cardiovascular_label": int(
+            (not is_imputed["total_cholesterol"] and values["total_cholesterol"] >= 240.0) or 
+            (not is_imputed["ldl_cholesterol"] and values["ldl_cholesterol"] >= 160.0) or 
+            (not is_imputed["triglycerides"] and values["triglycerides"] >= 200.0)
+        ),
+        # AKI/CKD indicator; male upper normal 1.2, female 1.0; 1.3 is clear elevation
+        "kidney_label": int(not is_imputed["creatinine"] and values["creatinine"] >= 1.3),
     }
 
     diagnosis_based = diagnosis_flags.get(subject_id, {})
@@ -198,7 +208,7 @@ def build_row(subject_id, patients, latest, encounter_counts, medians, diagnosis
         else:
             resolved_labels[field_name] = int(diagnosis_based.get(short_name, 0) or threshold_labels[field_name])
 
-    return {
+    row_dict = {
         "patient_id": f"MIMIC-{subject_id}",
         "encounter_date": encounter_date,
         "hemoglobin": round(values["hemoglobin"], 4),
@@ -210,8 +220,12 @@ def build_row(subject_id, patients, latest, encounter_counts, medians, diagnosis
         "triglycerides": round(values["triglycerides"], 4),
         "abnormal_ratio": round(abnormal_ratio, 4),
         "record_count": record_count,
-        **resolved_labels,
     }
+    for feature in FEATURE_ORDER:
+        row_dict[f"{feature}_imputed"] = is_imputed[feature]
+    
+    row_dict.update(resolved_labels)
+    return row_dict
 
 
 def main():
@@ -251,13 +265,8 @@ def main():
     fieldnames = [
         "patient_id",
         "encounter_date",
-        "hemoglobin",
-        "fasting_glucose",
-        "total_cholesterol",
-        "creatinine",
-        "hba1c",
-        "ldl_cholesterol",
-        "triglycerides",
+        *FEATURE_ORDER,
+        *[f"{f}_imputed" for f in FEATURE_ORDER],
         "abnormal_ratio",
         "record_count",
         "anemia_label",

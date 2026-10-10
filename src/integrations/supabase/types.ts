@@ -21,6 +21,9 @@ export type Database = {
           date: string
           doctor: string
           extracted_data: Json | null
+          medications: Json | null
+          bill_items: Json | null
+          bill_summary: Json | null
           file_name: string
           file_path: string | null
           hospital: string
@@ -42,6 +45,9 @@ export type Database = {
           date?: string
           doctor?: string
           extracted_data?: Json | null
+          medications?: Json | null
+          bill_items?: Json | null
+          bill_summary?: Json | null
           file_name: string
           file_path?: string | null
           hospital?: string
@@ -63,6 +69,9 @@ export type Database = {
           date?: string
           doctor?: string
           extracted_data?: Json | null
+          medications?: Json | null
+          bill_items?: Json | null
+          bill_summary?: Json | null
           file_name?: string
           file_path?: string | null
           hospital?: string

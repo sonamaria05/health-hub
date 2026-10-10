@@ -9,19 +9,53 @@ export interface LocalExtractionResult {
 }
 
 const metricDefinitions = [
-  { canonical: 'Hemoglobin', aliases: ['hemoglobin', 'hb'], unit: 'g/dL', range: '12-16' },
-  { canonical: 'Fasting Glucose', aliases: ['fasting glucose', 'glucose', 'blood glucose', 'sugar'], unit: 'mg/dL', range: '70-100' },
-  { canonical: 'Total Cholesterol', aliases: ['total cholesterol', 'cholesterol'], unit: 'mg/dL', range: '0-200' },
-  { canonical: 'LDL Cholesterol', aliases: ['ldl cholesterol', 'ldl'], unit: 'mg/dL', range: '0-100' },
-  { canonical: 'HDL Cholesterol', aliases: ['hdl cholesterol', 'hdl'], unit: 'mg/dL', range: '40-60' },
-  { canonical: 'Triglycerides', aliases: ['triglycerides', 'triglyceride'], unit: 'mg/dL', range: '0-150' },
-  { canonical: 'Creatinine', aliases: ['creatinine'], unit: 'mg/dL', range: '0.6-1.2' },
-  { canonical: 'HbA1c', aliases: ['hba1c', 'hb a1c', 'a1c'], unit: '%', range: '0-5.7' },
-  { canonical: 'WBC', aliases: ['wbc', 'white blood cells'], unit: '10^3/uL', range: '4-11' },
-  { canonical: 'Platelets', aliases: ['platelets', 'platelet count'], unit: '10^3/uL', range: '150-450' },
-  { canonical: 'RBC', aliases: ['rbc', 'red blood cells'], unit: '10^6/uL', range: '4.2-5.9' },
-  { canonical: 'Urea', aliases: ['urea', 'blood urea'], unit: 'mg/dL', range: '10-50' },
-  { canonical: 'Bilirubin', aliases: ['bilirubin', 'total bilirubin'], unit: 'mg/dL', range: '0.1-1.2' },
+  { canonical: 'Hemoglobin', aliases: ['hemoglobin', 'haemoglobin', 'hb'], unit: 'g/dL', range: '12-16' },
+  { canonical: 'Fasting Glucose', aliases: ['fasting glucose', 'glucose', 'blood glucose', 'fasting blood sugar', 'fbs', 'sugar'], unit: 'mg/dL', range: '70-100' },
+  { canonical: 'Total Cholesterol', aliases: ['total cholesterol', 'serum cholesterol', 'cholesterol'], unit: 'mg/dL', range: '0-200' },
+  { canonical: 'LDL Cholesterol', aliases: ['ldl cholesterol', 'ldl', 'serum ldl'], unit: 'mg/dL', range: '0-100' },
+  { canonical: 'HDL Cholesterol', aliases: ['hdl cholesterol', 'hdl', 'serum hdl'], unit: 'mg/dL', range: '40-60' },
+  { canonical: 'Triglycerides', aliases: ['triglycerides', 'triglyceride', 'tg'], unit: 'mg/dL', range: '0-150' },
+  { canonical: 'Creatinine', aliases: ['serum creatinine', 's. creatinine', 'creatinine'], unit: 'mg/dL', range: '0.6-1.2' },
+  { canonical: 'HbA1c', aliases: ['hba1c', 'hb a1c', 'a1c', 'glycated hemoglobin'], unit: '%', range: '0-5.7' },
+  { canonical: 'WBC', aliases: ['total w.b.c', 'total wbc', 'w.b.c', 'wbc', 'white blood cells', 'total leukocyte count'], unit: 'cells/cumm', range: '4000-11000' },
+  { canonical: 'Platelets', aliases: ['platelet count', 'total platelet count', 'platelets'], unit: 'Lakhs/cumm', range: '1.5-4.5' },
+  { canonical: 'RBC', aliases: ['total r.b.c', 'total rbc', 'r.b.c', 'rbc', 'red blood cells'], unit: 'mill/cumm', range: '3.5-5.5' },
+  { canonical: 'Neutrophils', aliases: ['neutrophils', 'neutrophil'], unit: '%', range: '40-70' },
+  { canonical: 'Lymphocytes', aliases: ['lymphocytes', 'lymphocyte'], unit: '%', range: '20-40' },
+  { canonical: 'Eosinophils', aliases: ['eosinophils', 'eosinophil'], unit: '%', range: '1-6' },
+  { canonical: 'Monocytes', aliases: ['monocytes', 'monocyte'], unit: '%', range: '1-3' },
+  { canonical: 'Basophils', aliases: ['basophils', 'basophil'], unit: '%', range: '0-1' },
+  { canonical: 'PCV', aliases: ['p.c.v', 'p.cv', 'pcv', 'packed cell volume', 'hematocrit'], unit: '%', range: '37-54' },
+  { canonical: 'MCV', aliases: ['m.c.v', 'm.cv', 'mcv'], unit: 'fl', range: '80-100' },
+  { canonical: 'MCH', aliases: ['m.c.h', 'm.ch', 'mch'], unit: 'pg', range: '27-34' },
+  { canonical: 'MCHC', aliases: ['m.c.h.c', 'm.ch.c', 'mchc'], unit: '%', range: '32-36' },
+  { canonical: 'RDW-CV', aliases: ['rdw-cv', 'rdw cv', 'rdw'], unit: '%', range: '11-16' },
+  { canonical: 'RDW-SD', aliases: ['rdw-sd', 'rdw sd'], unit: 'fl', range: '35-56' },
+  { canonical: 'MPV', aliases: ['mpv'], unit: 'fl', range: '6.5-12' },
+  { canonical: 'PCT', aliases: ['pct'], unit: '%', range: '108-282' },
+  { canonical: 'Urea', aliases: ['blood urea nitrogen', 'blood urea', 'urea', 'bun'], unit: 'mg/dL', range: '10-50' },
+  { canonical: 'Bilirubin', aliases: ['total bilirubin', 'serum bilirubin', 'bilirubin'], unit: 'mg/dL', range: '0.1-1.2' },
+  { canonical: 'Direct Bilirubin', aliases: ['direct bilirubin', 'conjugated bilirubin'], unit: 'mg/dL', range: '0.0-0.3' },
+  { canonical: 'SGOT / AST', aliases: ['sgot / ast', 'sgot', 'ast', 'aspartate aminotransferase'], unit: 'U/L', range: '10-40' },
+  { canonical: 'SGPT / ALT', aliases: ['sgpt / alt', 'sgpt', 'alt', 'alanine aminotransferase'], unit: 'U/L', range: '7-56' },
+  { canonical: 'Alkaline Phosphatase', aliases: ['alkaline phosphatase', 'alp', 'alk phos'], unit: 'U/L', range: '44-147' },
+  { canonical: 'Total Protein', aliases: ['total protein', 'serum protein'], unit: 'g/dL', range: '6.0-8.3' },
+  { canonical: 'Albumin', aliases: ['serum albumin', 'albumin'], unit: 'g/dL', range: '3.5-5.5' },
+  { canonical: 'Globulin', aliases: ['serum globulin', 'globulin'], unit: 'g/dL', range: '2.0-3.5' },
+  { canonical: 'Uric Acid', aliases: ['serum uric acid', 'uric acid'], unit: 'mg/dL', range: '3.5-7.2' },
+  { canonical: 'Calcium', aliases: ['serum calcium', 'calcium'], unit: 'mg/dL', range: '8.5-10.5' },
+  { canonical: 'Sodium', aliases: ['serum sodium', 'sodium'], unit: 'mmol/L', range: '135-145' },
+  { canonical: 'Potassium', aliases: ['serum potassium', 'potassium'], unit: 'mmol/L', range: '3.5-5.0' },
+  { canonical: 'Chloride', aliases: ['serum chloride', 'chloride'], unit: 'mmol/L', range: '96-106' },
+  { canonical: 'TSH', aliases: ['thyroid stimulating hormone', 'tsh'], unit: 'mIU/L', range: '0.4-4.0' },
+  { canonical: 'T3', aliases: ['total t3', 'triiodothyronine', 't3'], unit: 'ng/dL', range: '80-200' },
+  { canonical: 'T4', aliases: ['total t4', 'thyroxine', 't4'], unit: 'ug/dL', range: '4.5-12.0' },
+  { canonical: 'Free T3', aliases: ['free t3', 'ft3'], unit: 'pg/mL', range: '2.0-4.4' },
+  { canonical: 'Free T4', aliases: ['free t4', 'ft4'], unit: 'ng/dL', range: '0.8-1.8' },
+  { canonical: 'Vitamin D', aliases: ['25-hydroxyvitamin d', '25 hydroxy vitamin d', '25-oh vitamin d', 'vitamin d'], unit: 'ng/mL', range: '30-100' },
+  { canonical: 'Vitamin B12', aliases: ['vitamin b12', 'b12', 'cobalamin'], unit: 'pg/mL', range: '200-900' },
+  { canonical: 'ESR', aliases: ['erythrocyte sedimentation rate', 'esr'], unit: 'mm/hr', range: '0-20' },
+  { canonical: 'CRP', aliases: ['c-reactive protein', 'crp'], unit: 'mg/L', range: '0-5' },
 ];
 
 const typeDetectionRules: Array<{ type: MedicalRecord['type']; terms: string[] }> = [
@@ -29,7 +63,7 @@ const typeDetectionRules: Array<{ type: MedicalRecord['type']; terms: string[] }
   { type: 'prescription', terms: ['prescription', 'rx', 'tablet', 'capsule', 'take once daily'] },
   { type: 'imaging', terms: ['x-ray', 'mri', 'ct scan', 'ultrasound', 'radiology', 'scan findings'] },
   { type: 'discharge_summary', terms: ['discharge summary', 'admission date', 'discharge date', 'hospital course'] },
-  { type: 'blood_test', terms: ['hemoglobin', 'glucose', 'cholesterol', 'cbc', 'blood test', 'triglycerides'] },
+  { type: 'blood_test', terms: ['hemoglobin', 'glucose', 'cholesterol', 'cbc', 'blood test', 'triglycerides', 'tsh', 'thyroid', 'vitamin d', 'haemoglobin', 'differential count'] },
 ];
 
 function normalizeWhitespace(value: string) {
@@ -47,12 +81,19 @@ function parseDateValue(value: string) {
     return direct.toISOString().slice(0, 10);
   }
 
-  const dmy = cleaned.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  const dmy = cleaned.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
   if (!dmy) return null;
 
-  const day = Number(dmy[1]);
-  const month = Number(dmy[2]);
+  let day = Number(dmy[1]);
+  let month = Number(dmy[2]);
   const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]);
+
+  if (month > 12 && day <= 12) {
+    [day, month] = [month, day];
+  }
+
+  if (day > 31 || month > 12 || month < 1) return null;
+
   const parsed = new Date(Date.UTC(year, month - 1, day));
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
@@ -69,8 +110,11 @@ function extractFirstMatch(text: string, patterns: RegExp[]) {
 }
 
 function parseNormalRange(fragment: string, fallback: string) {
-  const rangeMatch = fragment.match(/(?:range|normal|reference)[:\s]*([<>]?\s*\d+(?:\.\d+)?\s*-\s*[<>]?\s*\d+(?:\.\d+)?)/i);
-  return rangeMatch?.[1]?.replace(/\s+/g, '') ?? fallback;
+  const rangeMatch = fragment.match(/(\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?)/);
+  if (rangeMatch) {
+    return rangeMatch[1].replace(/\s+/g, '');
+  }
+  return fallback;
 }
 
 export function statusFromRange(value: number, normalRange: string): ExtractedMetric['status'] {
@@ -114,19 +158,34 @@ function extractAmount(text: string) {
 
 function extractMetrics(text: string): MedicalRecord['extractedData'] {
   const extractedData: NonNullable<MedicalRecord['extractedData']> = {};
+  const lines = text.split('\n');
 
   for (const metric of metricDefinitions) {
     for (const alias of metric.aliases) {
-      const pattern = new RegExp(`${escapeRegex(alias)}[^\\n\\r:]*[:\\s]+(-?\\d+(?:\\.\\d+)?)\\s*([%a-zA-Z/^0-9.-]+)?([^\\n\\r]*)`, 'i');
-      const match = text.match(pattern);
-      if (!match) continue;
+      const aliasRegex = new RegExp(`(?:^|[^a-zA-Z])${escapeRegex(alias)}(?:$|[^a-zA-Z])`, 'i');
 
-      const value = Number(match[1]);
+      const matchedLine = lines.find((line) => aliasRegex.test(line));
+      if (!matchedLine) continue;
+
+      const aliasPos = matchedLine.toLowerCase().indexOf(alias.toLowerCase());
+      const afterAlias = matchedLine.slice(aliasPos + alias.length);
+
+      // Non-greedy capture of the first numeric value on the line
+      const numMatch = afterAlias.match(/[:\s|]+(-?\d[\d,]*(?:\.\d+)?)\s*([%a-zA-Z/^0-9.-]+)?(.*)$/);
+      if (!numMatch) continue;
+
+      const rawNum = numMatch[1].replace(/,/g, '');
+      const value = Number(rawNum);
       if (!Number.isFinite(value)) continue;
 
-      const unit = (match[2] || metric.unit).trim();
-      const trailing = match[3] || '';
+      let unit = (numMatch[2] || '').trim();
+      if (!unit || /^[-–]/.test(unit)) {
+        unit = metric.unit;
+      }
+
+      const trailing = numMatch[3] || '';
       const normalRange = parseNormalRange(trailing, metric.range);
+
       extractedData[metric.canonical] = {
         value,
         unit,
@@ -163,26 +222,48 @@ export function extractMedicalRecordFromText(text: string, fileName: string): Lo
   const normalizedText = normalizeWhitespace(text);
   const type = detectType(normalizedText, fileName);
   const extractedData = extractMetrics(normalizedText);
-  const patientName = extractFirstMatch(normalizedText, [
+
+  let rawPatient = extractFirstMatch(normalizedText, [
+    /(?:patient name|pt\.?\s*name|name|ne)\s*[:|.]?\s*((?:mr|mrs|ms|miss|wis|master)\.?\s+[a-zA-Z\s]+)/i,
     /patient name[:\s]+([^\n]+)/i,
-    /name[:\s]+([^\n]+)/i,
+    /(?:^|\n)\s*name[:\s]+([^\n]+)/i,
   ]);
-  const doctor = extractFirstMatch(normalizedText, [
-    /doctor[:\s]+([^\n]+)/i,
-    /(dr\.?\s+[a-z][^\n,]*)/i,
+  if (rawPatient) {
+    rawPatient = rawPatient
+      .replace(/\s*(?:age|sex|reg|lab|dob|ref|dr|sample|date|prescr|te\b).*$/i, '')
+      .replace(/^(?:wis\b)/i, 'Miss')
+      .trim();
+  }
+
+  let doctor = extractFirstMatch(normalizedText, [
+    /(?:referred\s+[a-z]+|doctor|consultant)\s*[:|©]?\s*(?:dr\.?\s+)?([a-zA-Z\s]+)/i,
+    /(?:dr\.?\s+)([A-Z][a-zA-Z\s]+)/,
   ]) || 'Auto-Detected';
-  const hospital = extractFirstMatch(normalizedText, [
-    /hospital[:\s]+([^\n]+)/i,
-    /lab(?:oratory)?[:\s]+([^\n]+)/i,
-    /clinic[:\s]+([^\n]+)/i,
-  ]) || 'Uploaded by Patient';
+
+  if (doctor && doctor !== 'Auto-Detected') {
+    doctor = doctor.replace(/\s*(?:mbbs|md|ms|d\.u\.s|d\s*ortho|date|sample|time).*$/i, '').trim();
+    if (!doctor.toLowerCase().startsWith('dr.')) {
+      doctor = `Dr. ${doctor}`;
+    }
+  }
+
+  const hospitalLine = normalizedText.split('\n').find((line) =>
+    /hospital|diagnostic|clinic|centre|center|laboratory/i.test(line) &&
+    !/doctor|patient|report|sample/i.test(line)
+  );
+
+  let hospital = 'Uploaded by Patient';
+  if (hospitalLine) {
+    hospital = hospitalLine.replace(/^[^\w]+/, '').replace(/[^\w\s&,.-]+$/, '').trim();
+  }
+
   const dateValue = extractFirstMatch(normalizedText, [
-    /(?:report date|date of report|test date|date)[:\s]+([^\n]+)/i,
+    /(?:date of report|report date|sample collection at|test date|date)\s*[:.]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
     /(\d{4}-\d{2}-\d{2})/,
     /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/,
     /([A-Z][a-z]{2,8}\s+\d{1,2},\s+\d{4})/,
   ]);
-  const parsedDate = parseDateValue(dateValue) ?? new Date().toISOString().slice(0, 10);
+  const parsedDate = parseDateValue(dateValue) || '';
   const amount = type === 'bill' ? extractAmount(normalizedText) : undefined;
   const title = extractTitle(normalizedText, fileName, type);
   const status = deriveRecordStatus(extractedData);
@@ -192,7 +273,7 @@ export function extractMedicalRecordFromText(text: string, fileName: string): Lo
     date: parsedDate,
     doctor,
     hospital,
-    patientName: patientName || undefined,
+    patientName: rawPatient || undefined,
     extractedData,
     amount,
     status,
@@ -217,7 +298,7 @@ export function buildManualReviewRecord(fileName: string, reason?: string): Loca
   const record: Partial<MedicalRecord> = {
     type: 'blood_test',
     title: `Uploaded Report - ${fileName.replace(/\.[^.]+$/, '')}`,
-    date: new Date().toISOString().slice(0, 10),
+    date: '',
     doctor: 'Auto-Detected',
     hospital: 'Uploaded by Patient',
     status: 'normal',

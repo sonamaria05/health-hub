@@ -8,6 +8,7 @@ type AppRole = Database['public']['Enums']['app_role'];
 interface Profile {
   display_name: string | null;
   avatar_url: string | null;
+  analytics_opt_in: boolean;
 }
 
 interface AuthContextType {
@@ -72,13 +73,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('display_name, avatar_url')
+        .select('display_name, avatar_url, analytics_opt_in')
         .eq('user_id', nextUser.id)
         .maybeSingle();
 
       if (error) {
         console.error('Error loading profile:', error);
-        setProfile({ display_name: fallbackDisplayName, avatar_url: null });
+        setProfile({ display_name: fallbackDisplayName, avatar_url: null, analytics_opt_in: false });
         return;
       }
 
@@ -93,12 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_id: nextUser.id,
           display_name: fallbackDisplayName,
         })
-        .select('display_name, avatar_url')
+        .select('display_name, avatar_url, analytics_opt_in')
         .single();
 
       if (createError) {
         console.error('Error creating profile:', createError);
-        setProfile({ display_name: fallbackDisplayName, avatar_url: null });
+        setProfile({ display_name: fallbackDisplayName, avatar_url: null, analytics_opt_in: false });
         return;
       }
 
@@ -146,12 +147,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user_id: user.id,
       display_name: updates.display_name ?? profile?.display_name ?? null,
       avatar_url: updates.avatar_url ?? profile?.avatar_url ?? null,
+      analytics_opt_in: updates.analytics_opt_in ?? profile?.analytics_opt_in ?? false,
     };
 
     const { data, error } = await supabase
       .from('profiles')
       .upsert(payload, { onConflict: 'user_id' })
-      .select('display_name, avatar_url')
+      .select('display_name, avatar_url, analytics_opt_in')
       .single();
 
     if (error) throw error;

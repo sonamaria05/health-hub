@@ -8,7 +8,7 @@ test('root route redirects unauthenticated users to auth', async ({ page }) => {
 test('favicon is exposed as the project branding asset', async ({ page }) => {
   await page.goto('/auth');
   const faviconHref = await page.locator('link[rel="icon"]').getAttribute('href');
-  expect(faviconHref).toBe('/favicon.svg');
+  expect(faviconHref).toBe('/icon.png');
 });
 
 for (const route of ['/upload', '/records', '/analytics', '/predictions', '/settings']) {

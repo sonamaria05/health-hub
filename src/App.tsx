@@ -9,6 +9,7 @@ import UploadPage from "@/pages/UploadPage";
 import RecordsPage from "@/pages/RecordsPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import PredictionsPage from "@/pages/PredictionsPage";
+import BillingPage from "@/pages/BillingPage";
 import ClinicianDashboardPage from "@/pages/ClinicianDashboardPage";
 import AuthPage from "@/pages/AuthPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
@@ -19,6 +20,7 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { RemindersProvider } from "@/lib/RemindersContext";
 import RequireAuth from "@/components/RequireAuth";
 import RequireRole from "@/components/RequireRole";
+import IdleTimeout from "@/components/IdleTimeout";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,7 @@ const queryClient = new QueryClient();
 function ProtectedRoutes() {
   return (
     <RequireAuth>
+      <IdleTimeout />
       <RecordsProvider>
         <RemindersProvider>
           <AppLayout>
@@ -35,6 +38,7 @@ function ProtectedRoutes() {
               <Route path="/records" element={<RecordsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/predictions" element={<PredictionsPage />} />
+              <Route path="/billing" element={<BillingPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route
                 path="/clinician"

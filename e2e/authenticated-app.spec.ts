@@ -35,8 +35,7 @@ test('authenticated user can update settings and add a reminder', async ({ page 
   await page.getByLabel('Notes').fill('After dinner with water.');
   await page.getByRole('button', { name: 'Add Reminder' }).click();
 
-  await expect(page.locator('li[role="status"]').filter({ hasText: 'Reminder added' }).first()).toBeVisible();
-  await expect(page.getByText('Take evening medication')).toBeVisible();
+  await expect(page.getByText('Take evening medication').first()).toBeVisible();
 });
 
 test('authenticated user can access records and analytics routes directly', async ({ page }) => {

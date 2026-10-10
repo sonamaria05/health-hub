@@ -83,13 +83,24 @@ function getLatestMetricValue(records: RecordLike[], aliases: readonly string[])
 }
 
 export function deriveEngineeredFeatures(base: Omit<FeatureSnapshot, 'anemia_signal' | 'glycemic_signal' | 'lipid_signal' | 'kidney_signal' | 'risk_burden' | 'glucose_hba1c_interaction' | 'lipid_density' | 'renal_load'>) {
-  const anemiaSignal = Math.max(0, 12 - base.hemoglobin);
-  const glycemicSignal = Math.max(0, base.fasting_glucose - 100) + Math.max(0, (base.hba1c - 5.7) * 18);
+  // WHO anemia thresholds: female <12, male <13 g/dL.
+  // Since sex is unknown at runtime, use 13.0 (conservative unisex upper bound)
+  // so male anemia is not missed. Signal = 0 when Hb is above threshold.
+  const anemiaSignal = Math.max(0, 13 - base.hemoglobin);
+
+  // ADA 2024: pre-diabetes glucose ≥ 100, diabetes ≥ 126. HbA1c pre-diabetes ≥ 5.7, diabetes ≥ 6.5.
+  // Glycemic signal captures both pre-diabetes and diabetes elevations for ML features.
+  const glycemicSignal = Math.max(0, base.fasting_glucose - 99) + Math.max(0, (base.hba1c - 5.7) * 18);
+
+  // AHA lipid risk: TC ≥ 200 borderline, ≥ 240 high. LDL ≥ 130 borderline, ≥ 160 high. TG ≥ 150 borderline.
   const lipidSignal =
     Math.max(0, base.total_cholesterol - 200) +
     Math.max(0, base.ldl_cholesterol - 100) +
     0.45 * Math.max(0, base.triglycerides - 150);
+
+  // KDIGO: creatinine > 1.2 mg/dL = above upper normal. Signal scaled to emphasise elevations.
   const kidneySignal = Math.max(0, (base.creatinine - 1.2) * 100);
+
   const riskBurden = base.abnormal_ratio * 100 + 1.4 * anemiaSignal + 0.1 * glycemicSignal + 0.035 * lipidSignal + 0.08 * kidneySignal;
   const glucoseHba1cInteraction = (base.fasting_glucose * base.hba1c) / 100;
   const lipidDensity = (base.total_cholesterol + base.ldl_cholesterol + 0.5 * base.triglycerides) / Math.max(base.record_count, 1);
@@ -107,6 +118,7 @@ export function deriveEngineeredFeatures(base: Omit<FeatureSnapshot, 'anemia_sig
   };
 }
 
+
 export function buildFeatureSnapshot(records: RecordLike[]): FeatureSnapshot {
   const recordsWithData = records.filter(record => Object.keys(record.extractedData ?? {}).length > 0);
   let totalMetrics = 0;
@@ -122,14 +134,14 @@ export function buildFeatureSnapshot(records: RecordLike[]): FeatureSnapshot {
   }
 
   const base = {
-    hemoglobin: getLatestMetricValue(recordsWithData, featureDefinitions.hemoglobin.aliases) ?? 12.2,
-    fasting_glucose: getLatestMetricValue(recordsWithData, featureDefinitions.fasting_glucose.aliases) ?? 101,
-    total_cholesterol: getLatestMetricValue(recordsWithData, featureDefinitions.total_cholesterol.aliases) ?? 205,
-    creatinine: getLatestMetricValue(recordsWithData, featureDefinitions.creatinine.aliases) ?? 1.0,
-    hba1c: getLatestMetricValue(recordsWithData, featureDefinitions.hba1c.aliases) ?? 5.6,
-    ldl_cholesterol: getLatestMetricValue(recordsWithData, featureDefinitions.ldl_cholesterol.aliases) ?? 130,
-    triglycerides: getLatestMetricValue(recordsWithData, featureDefinitions.triglycerides.aliases) ?? 145,
-    abnormal_ratio: totalMetrics > 0 ? abnormalMetrics / totalMetrics : 0.18,
+    hemoglobin: getLatestMetricValue(recordsWithData, featureDefinitions.hemoglobin.aliases) ?? 13.5,
+    fasting_glucose: getLatestMetricValue(recordsWithData, featureDefinitions.fasting_glucose.aliases) ?? 90,
+    total_cholesterol: getLatestMetricValue(recordsWithData, featureDefinitions.total_cholesterol.aliases) ?? 180,
+    creatinine: getLatestMetricValue(recordsWithData, featureDefinitions.creatinine.aliases) ?? 0.9,
+    hba1c: getLatestMetricValue(recordsWithData, featureDefinitions.hba1c.aliases) ?? 5.2,
+    ldl_cholesterol: getLatestMetricValue(recordsWithData, featureDefinitions.ldl_cholesterol.aliases) ?? 95,
+    triglycerides: getLatestMetricValue(recordsWithData, featureDefinitions.triglycerides.aliases) ?? 120,
+    abnormal_ratio: totalMetrics > 0 ? abnormalMetrics / totalMetrics : 0.05,
     record_count: Math.max(recordsWithData.length, 1),
   };
 

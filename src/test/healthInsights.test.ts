@@ -16,8 +16,17 @@ describe('health insights helpers', () => {
   });
 
   it('generates health insights with corrected risk ordering', () => {
-    const insights = generateHealthInsights(mockRecords);
-    expect(insights.some(item => item.condition === 'Cardiovascular Risk')).toBe(true);
+    const customRecords = [
+      {
+        ...mockRecords[0],
+        extractedData: {
+          'Total Cholesterol': { value: 300, unit: 'mg/dL', normalRange: '0-200', status: 'high' },
+          'LDL Cholesterol': { value: 190, unit: 'mg/dL', normalRange: '0-100', status: 'high' }
+        }
+      }
+    ];
+    const insights = generateHealthInsights(customRecords);
+    expect(insights.some(item => item.condition === 'Cardiovascular & Lipid Risk')).toBe(true);
     expect(insights.some(item => item.risk === 'high' || item.risk === 'moderate')).toBe(true);
   });
 });

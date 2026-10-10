@@ -8,9 +8,9 @@
 
 ## Dataset
 
-- Source rows (before augmentation): 100
+- Source rows (before augmentation): 80
 - Train rows (after augmentation): 375
-- Test rows (after augmentation): 125
+- Test rows (after augmentation): 25
 - Augmentation factor: 4x synthetic variants per source row (Gaussian noise within clinically plausible bounds - see `augment_rows()`)
 - Random seed: 42
 
@@ -24,119 +24,119 @@
 
 ### Anemia Risk
 
-- **Selected model**: `xgboost` (chosen by blended cross-validated AUC+F1 score, not accuracy - see candidate comparison below)
-- **Decision threshold**: 0.4 (tuned on calibrated out-of-fold probabilities to maximize F1)
+- **Selected model**: `random_forest` (chosen by blended cross-validated AUC+F1 score, not accuracy - see candidate comparison below)
+- **Decision threshold**: 0.55 (tuned on calibrated out-of-fold probabilities to maximize F1)
 
 | Metric | Cross-validated | Held-out test |
 |---|---|---|
-| ROC-AUC | 0.9166 | 0.8889 |
-| F1 | 0.8427 | 0.8125 |
-| Precision | - | 0.7879 |
-| Recall | - | 0.8387 |
-| Accuracy | - | 0.808 |
-| Brier score (calibrated) | - | 0.1306 |
-| Brier score (uncalibrated) | - | 0.132 |
+| ROC-AUC | 0.9953 | 1.0 |
+| F1 | 0.9879 | 0.9778 |
+| Precision | - | 0.9565 |
+| Recall | - | 1.0 |
+| Accuracy | - | 0.96 |
+| Brier score (calibrated) | - | 0.037 |
+| Brier score (uncalibrated) | - | 0.0222 |
 
-**Confusion matrix (test set, n=125)**: TP=52, FP=14, TN=49, FN=10
+**Confusion matrix (test set, n=25)**: TP=22, FP=1, TN=2, FN=0
 
-**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.1244 vs 0.1118 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.132 to 0.1306 (better).
+**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.0188 vs 0.0184 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.0222 to 0.037 (not better).
 
-**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `hemoglobin` (1.063372), `renal_load` (0.709175), `lipid_density` (0.626876), `triglycerides` (0.562656), `creatinine` (0.47416)
+**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `hemoglobin` (0.1766), `anemia_signal` (0.17101), `fasting_glucose` (0.053003), `abnormal_ratio` (0.021063), `risk_burden` (0.019706)
 
 **Candidate comparison** (cross-validated, all evaluated the same way):
 
 | Candidate | CV AUC | CV F1 | Blended score |
 |---|---|---|---|
-| `logistic_regression` | 0.8178 | 0.7395 | 0.7786 |
-| `random_forest` | 0.8935 | 0.8274 | 0.8604 |
-| `xgboost` **(selected)** | 0.9166 | 0.8427 | 0.8796 |
+| `logistic_regression` | 0.9908 | 0.9908 | 0.9908 |
+| `random_forest` **(selected)** | 0.9953 | 0.9879 | 0.9916 |
+| `xgboost` | 0.9873 | 0.974 | 0.9807 |
 
 ### Diabetes Risk
 
-- **Selected model**: `xgboost` (chosen by blended cross-validated AUC+F1 score, not accuracy - see candidate comparison below)
-- **Decision threshold**: 0.3 (tuned on calibrated out-of-fold probabilities to maximize F1)
+- **Selected model**: `random_forest` (chosen by blended cross-validated AUC+F1 score, not accuracy - see candidate comparison below)
+- **Decision threshold**: 0.6 (tuned on calibrated out-of-fold probabilities to maximize F1)
 
 | Metric | Cross-validated | Held-out test |
 |---|---|---|
-| ROC-AUC | 0.957 | 0.9745 |
-| F1 | 0.8633 | 0.8632 |
-| Precision | - | 0.8039 |
-| Recall | - | 0.9318 |
-| Accuracy | - | 0.896 |
-| Brier score (calibrated) | - | 0.0583 |
-| Brier score (uncalibrated) | - | 0.0612 |
+| ROC-AUC | 1.0 | 1.0 |
+| F1 | 1.0 | 1.0 |
+| Precision | - | 1.0 |
+| Recall | - | 1.0 |
+| Accuracy | - | 1.0 |
+| Brier score (calibrated) | - | 0.0161 |
+| Brier score (uncalibrated) | - | 0.018 |
 
-**Confusion matrix (test set, n=125)**: TP=41, FP=10, TN=71, FN=3
+**Confusion matrix (test set, n=25)**: TP=19, FP=0, TN=6, FN=0
 
-**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.1049 vs 0.0802 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.0612 to 0.0583 (better).
+**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.0033 vs 0.003 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.018 to 0.0161 (better).
 
-**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `hba1c` (0.931696), `glucose_hba1c_interaction` (0.615418), `glycemic_signal` (0.578514), `fasting_glucose` (0.526533), `hemoglobin` (0.474654)
+**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `glycemic_signal` (0.188338), `hba1c` (0.181421), `glucose_hba1c_interaction` (0.058439), `fasting_glucose` (0.024599), `hemoglobin` (0.016193)
 
 **Candidate comparison** (cross-validated, all evaluated the same way):
 
 | Candidate | CV AUC | CV F1 | Blended score |
 |---|---|---|---|
-| `logistic_regression` | 0.801 | 0.6395 | 0.7203 |
-| `random_forest` | 0.9424 | 0.8071 | 0.8748 |
-| `xgboost` **(selected)** | 0.957 | 0.8633 | 0.9102 |
+| `logistic_regression` | 0.9894 | 0.9935 | 0.9915 |
+| `random_forest` **(selected)** | 1.0 | 1.0 | 1.0 |
+| `xgboost` | 0.9998 | 0.9968 | 0.9983 |
 
 ### Cardiovascular Risk
 
 - **Selected model**: `xgboost` (chosen by blended cross-validated AUC+F1 score, not accuracy - see candidate comparison below)
-- **Decision threshold**: 0.425 (tuned on calibrated out-of-fold probabilities to maximize F1)
+- **Decision threshold**: 0.65 (tuned on calibrated out-of-fold probabilities to maximize F1)
 
 | Metric | Cross-validated | Held-out test |
 |---|---|---|
-| ROC-AUC | 0.9282 | 0.9659 |
-| F1 | 0.9355 | 0.9569 |
-| Precision | - | 0.9346 |
-| Recall | - | 0.9804 |
-| Accuracy | - | 0.928 |
-| Brier score (calibrated) | - | 0.0585 |
-| Brier score (uncalibrated) | - | 0.0641 |
+| ROC-AUC | 0.9607 | 0.68 |
+| F1 | 0.9535 | 0.8205 |
+| Precision | - | 0.8421 |
+| Recall | - | 0.8 |
+| Accuracy | - | 0.72 |
+| Brier score (calibrated) | - | 0.2045 |
+| Brier score (uncalibrated) | - | 0.2156 |
 
-**Confusion matrix (test set, n=125)**: TP=100, FP=7, TN=16, FN=2
+**Confusion matrix (test set, n=25)**: TP=16, FP=3, TN=2, FN=4
 
-**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.0967 vs 0.0861 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.0641 to 0.0585 (better).
+**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.1148 vs 0.0633 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.2156 to 0.2045 (better).
 
-**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `hemoglobin` (1.044954), `risk_burden` (0.988627), `creatinine` (0.691811), `abnormal_ratio` (0.407447), `fasting_glucose` (0.336934)
+**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `hemoglobin` (1.217971), `creatinine` (0.768073), `risk_burden` (0.480285), `renal_load` (0.420821), `abnormal_ratio` (0.404872)
 
 **Candidate comparison** (cross-validated, all evaluated the same way):
 
 | Candidate | CV AUC | CV F1 | Blended score |
 |---|---|---|---|
-| `logistic_regression` | 0.8464 | 0.8827 | 0.8646 |
-| `random_forest` | 0.9205 | 0.9256 | 0.923 |
-| `xgboost` **(selected)** | 0.9282 | 0.9355 | 0.9318 |
+| `logistic_regression` | 0.8571 | 0.8705 | 0.8638 |
+| `random_forest` | 0.9527 | 0.9498 | 0.9512 |
+| `xgboost` **(selected)** | 0.9607 | 0.9535 | 0.9571 |
 
 ### Kidney Function Risk
 
 - **Selected model**: `xgboost` (chosen by blended cross-validated AUC+F1 score, not accuracy - see candidate comparison below)
-- **Decision threshold**: 0.35 (tuned on calibrated out-of-fold probabilities to maximize F1)
+- **Decision threshold**: 0.275 (tuned on calibrated out-of-fold probabilities to maximize F1)
 
 | Metric | Cross-validated | Held-out test |
 |---|---|---|
-| ROC-AUC | 0.9776 | 0.9528 |
-| F1 | 0.9373 | 0.8727 |
-| Precision | - | 0.8571 |
-| Recall | - | 0.8889 |
-| Accuracy | - | 0.888 |
-| Brier score (calibrated) | - | 0.1 |
-| Brier score (uncalibrated) | - | 0.0967 |
+| ROC-AUC | 0.9936 | 0.7153 |
+| F1 | 0.9677 | 0.6667 |
+| Precision | - | 0.6667 |
+| Recall | - | 0.6667 |
+| Accuracy | - | 0.76 |
+| Brier score (calibrated) | - | 0.2166 |
+| Brier score (uncalibrated) | - | 0.2227 |
 
-**Confusion matrix (test set, n=125)**: TP=48, FP=8, TN=63, FN=6
+**Confusion matrix (test set, n=25)**: TP=6, FP=3, TN=13, FN=3
 
-**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.0492 vs 0.0451 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.0967 to 0.1 (not better).
+**Calibration**: sklearn's `CalibratedClassifierCV(method="sigmoid", cv=3)` was evaluated explicitly as a diagnostic (cross-validated Brier score 0.0446 vs 0.0256 uncalibrated - not an improvement at that cross-fitting granularity on this dataset size). The deployed model instead uses a single Platt-scaling transform fit on the full out-of-fold prediction set, which is exactly reproducible in the TypeScript inference engine - see `SECURITY.md` and the comment in `choose_model()` for why. On the held-out test set, deployed calibration changed Brier score from 0.2227 to 0.2166 (better).
 
-**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `creatinine` (2.119555), `renal_load` (0.893939), `fasting_glucose` (0.723452), `hemoglobin` (0.517587), `risk_burden` (0.47414)
+**Top SHAP-ranked features** (mean absolute SHAP value on the training set): `creatinine` (2.877139), `renal_load` (1.142826), `hemoglobin` (0.662141), `glycemic_signal` (0.500661), `glucose_hba1c_interaction` (0.472228)
 
 **Candidate comparison** (cross-validated, all evaluated the same way):
 
 | Candidate | CV AUC | CV F1 | Blended score |
 |---|---|---|---|
-| `logistic_regression` | 0.926 | 0.8497 | 0.8879 |
-| `random_forest` | 0.9648 | 0.9164 | 0.9406 |
-| `xgboost` **(selected)** | 0.9776 | 0.9373 | 0.9574 |
+| `logistic_regression` | 0.9715 | 0.9073 | 0.9394 |
+| `random_forest` | 0.991 | 0.9581 | 0.9746 |
+| `xgboost` **(selected)** | 0.9936 | 0.9677 | 0.9807 |
 
 ## Known limitations
 
@@ -145,3 +145,5 @@
 - **Synthetic augmentation.** Roughly 80% of the rows used for training/testing are Gaussian-noised synthetic variants of the ~100 real rows, not independent real patients. This inflates the effective sample size for CV purposes but does not add genuinely new information.
 - **Per-instance "top contributing factors" for tree models (random forest / XGBoost) are an approximation**, not exact per-instance SHAP - see the comment above `shapInformedFactors()` in `src/lib/mlRisk.ts` for the exact method and why.
 - **This model card is regenerated on every training run** and reflects only the most recent run's seed and data. It is not a historical record - see `model_training_runs` (Task 4) for that.
+
+- **High Feature Imputation for ICU Data.** The Cardiovascular and Kidney labels are derived in hybrid mode (using actual MIMIC-IV ICU diagnosis codes), but the laboratory values for total_cholesterol and ldl_cholesterol are missing in 71% of the 100 demo patients. These are imputed with the population median (e.g., 172.0 for total cholesterol). Because the model receives healthy median imputed values but a positive diagnosis label, it struggles to separate the classes, resulting in lower AUCs (0.68) for these targets on the unaugmented test set.

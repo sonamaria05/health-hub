@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-sm space-y-5">
         <div className="text-center">
-          <img src="/favicon.svg" alt="Healytics logo" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
+          <img src="/icon.png" alt="Healytics logo" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
           <h1 className="text-2xl font-heading font-bold">Set New Password</h1>
         </div>
         {!ready ? (

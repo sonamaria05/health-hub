@@ -32,6 +32,13 @@ BASE_FEATURES = [
     "hba1c",
     "ldl_cholesterol",
     "triglycerides",
+    "hemoglobin_imputed",
+    "fasting_glucose_imputed",
+    "total_cholesterol_imputed",
+    "creatinine_imputed",
+    "hba1c_imputed",
+    "ldl_cholesterol_imputed",
+    "triglycerides_imputed",
     "abnormal_ratio",
     "record_count",
 ]
@@ -143,6 +150,9 @@ def augment_rows(rows, augment_factor, seed):
                     noise = rng.choice([-1, 0, 0, 1])
                     clone[feature] = str(int(clamp(round(value + noise), 1, 12)))
                     continue
+                if feature.endswith("_imputed") or feature == "abnormal_ratio":
+                    clone[feature] = str(int(value)) if feature.endswith("_imputed") else str(value)
+                    continue
 
                 noise_scale = {
                     "hemoglobin": 0.18,
@@ -152,7 +162,6 @@ def augment_rows(rows, augment_factor, seed):
                     "hba1c": 0.08,
                     "ldl_cholesterol": 5.0,
                     "triglycerides": 7.5,
-                    "abnormal_ratio": 0.025,
                 }[feature]
                 new_value = value + rng.gauss(0, noise_scale)
                 bounds = {
@@ -176,8 +185,9 @@ def base_feature_dict(row):
 
 
 def derive_features(base):
-    anemia_signal = max(0.0, 12.0 - base["hemoglobin"])
-    glycemic_signal = max(0.0, base["fasting_glucose"] - 100.0) + max(0.0, (base["hba1c"] - 5.7) * 18.0)
+    # Match mlRisk.ts thresholds: 13.0 for anemia, 99.0 for fasting_glucose, etc.
+    anemia_signal = max(0.0, 13.0 - base["hemoglobin"])
+    glycemic_signal = max(0.0, base["fasting_glucose"] - 99.0) + max(0.0, (base["hba1c"] - 5.7) * 18.0)
     lipid_signal = (
         max(0.0, base["total_cholesterol"] - 200.0)
         + max(0.0, base["ldl_cholesterol"] - 100.0)
@@ -739,8 +749,15 @@ def main():
     if len(rows) < 8:
         raise ValueError("Dataset is too small. Add more labeled rows before training.")
 
-    augmented_rows = augment_rows(rows, args.augment_factor, args.seed)
-    train_rows, test_rows = train_test_split(augmented_rows, test_size=args.test_ratio, random_state=args.seed)
+    patient_ids = sorted(list(set(r["patient_id"] for r in rows)))
+    train_pids, test_pids = train_test_split(patient_ids, test_size=args.test_ratio, random_state=args.seed)
+    train_pids_set = set(train_pids)
+    test_pids_set = set(test_pids)
+
+    base_train_rows = [r for r in rows if r["patient_id"] in train_pids_set]
+    test_rows = [r for r in rows if r["patient_id"] in test_pids_set]
+
+    train_rows = augment_rows(base_train_rows, args.augment_factor, args.seed)
 
     artifacts, metrics, train_feature_rows, test_feature_rows = build_artifacts(
         train_rows,

@@ -13,7 +13,7 @@ test('auth page supports login, signup, and forgot password states', async ({ pa
   await expect(page.getByLabel('Full Name')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create Account' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await expect(page.getByRole('button', { name: 'Send Reset Link' })).toBeVisible();
   await expect(page.getByLabel('Password')).toHaveCount(0);
@@ -42,7 +42,7 @@ test('forgot password mode can return to sign in mode', async ({ page }) => {
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await expect(page.getByRole('button', { name: 'Send Reset Link' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
   await expect(page.getByLabel('Password')).toBeVisible();
 });

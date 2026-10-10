@@ -51,8 +51,12 @@ export default function RecordCard({ record, onDelete, onEdit, showDetails = fal
                 {record.status}
               </span>
               {record.processingStatus && (
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                  {record.processingStatus.replace('_', ' ')}
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                  record.processingStatus === 'needs_review' 
+                    ? 'bg-warning/20 text-warning border border-warning/50'
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  {record.processingStatus === 'needs_review' ? '⚠ Needs Review' : record.processingStatus.replace('_', ' ')}
                 </span>
               )}
             </div>
@@ -73,7 +77,7 @@ export default function RecordCard({ record, onDelete, onEdit, showDetails = fal
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{record.summary}</p>
             )}
 
-            {showDetails && record.extractedData && (
+            {showDetails && record.extractedData && Object.keys(record.extractedData).length > 0 && (
               <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2">
                 {Object.entries(record.extractedData).map(([key, data]) => (
                   <div key={key} className="text-xs">
@@ -84,6 +88,41 @@ export default function RecordCard({ record, onDelete, onEdit, showDetails = fal
                     <span className="text-muted-foreground text-[10px] ml-1">({data.normalRange})</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {showDetails && record.medications && record.medications.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border space-y-1">
+                <p className="text-xs font-semibold mb-2">Medications:</p>
+                {record.medications.map((med, idx) => (
+                  <div key={idx} className="text-xs">
+                    <span className="font-medium">{med.name}</span>
+                    <span className="text-muted-foreground ml-1">
+                      — {med.dosage} • {med.frequency} • {med.duration}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showDetails && record.billItems && record.billItems.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border space-y-1">
+                <p className="text-xs font-semibold mb-2">Bill Items:</p>
+                {record.billItems.map((item, idx) => (
+                  <div key={idx} className="text-xs flex justify-between border-b border-border/50 pb-1 last:border-0 last:pb-0">
+                    <div>
+                      <span>{item.description}</span>
+                      {item.cptCode && <span className="text-[10px] text-muted-foreground ml-1">({item.cptCode})</span>}
+                    </div>
+                    <span className="font-mono">₹{item.amount}</span>
+                  </div>
+                ))}
+                {record.billSummary && (
+                  <div className="flex justify-between items-center text-xs font-bold pt-1 border-t border-border/50 mt-1">
+                    <span>Total Billed</span>
+                    <span>₹{record.billSummary.totalBilled}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

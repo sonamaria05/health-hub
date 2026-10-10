@@ -1,0 +1,67 @@
+{
+  "_comment": "Common drug/medicine names used in Indian prescriptions and pharmacy bills. Expand this list over time.",
+  "drugs": [
+    "Paracetamol", "Acetaminophen", "Ibuprofen", "Aspirin", "Amoxicillin",
+    "Amoxicillin-Clavulanate", "Augmentin", "Azithromycin", "Ciprofloxacin",
+    "Doxycycline", "Metronidazole", "Cefixime", "Cefpodoxime", "Ceftriaxone",
+    "Levofloxacin", "Clarithromycin", "Erythromycin", "Trimethoprim-Sulfamethoxazole",
+    "Nitrofurantoin", "Clindamycin", "Ampicillin", "Piperacillin-Tazobactam",
+    "Meropenem", "Imipenem", "Vancomycin", "Linezolid", "Doxorubicin",
+
+    "Atorvastatin", "Rosuvastatin", "Simvastatin", "Lovastatin", "Pravastatin",
+    "Ezetimibe", "Fenofibrate", "Gemfibrozil",
+
+    "Amlodipine", "Nifedipine", "Diltiazem", "Verapamil",
+    "Enalapril", "Ramipril", "Lisinopril", "Perindopril", "Telmisartan",
+    "Losartan", "Valsartan", "Olmesartan", "Irbesartan",
+    "Metoprolol", "Atenolol", "Carvedilol", "Bisoprolol", "Propranolol",
+    "Hydrochlorothiazide", "Furosemide", "Spironolactone", "Torsemide",
+    "Digoxin", "Warfarin", "Clopidogrel", "Aspirin", "Ticagrelor",
+    "Apixaban", "Rivaroxaban", "Dabigatran",
+
+    "Metformin", "Glibenclamide", "Glipizide", "Gliclazide", "Glimepiride",
+    "Sitagliptin", "Vildagliptin", "Saxagliptin", "Alogliptin",
+    "Empagliflozin", "Dapagliflozin", "Canagliflozin",
+    "Insulin Glargine", "Insulin Detemir", "Insulin Aspart", "Insulin Lispro",
+    "Insulin Regular", "Insulin NPH", "Pioglitazone", "Rosiglitazone",
+    "Liraglutide", "Semaglutide", "Dulaglutide", "Exenatide",
+
+    "Omeprazole", "Pantoprazole", "Rabeprazole", "Esomeprazole", "Lansoprazole",
+    "Ranitidine", "Famotidine", "Antacid", "Domperidone", "Ondansetron",
+    "Metoclopramide", "Loperamide", "Dicyclomine", "Mebeverine",
+
+    "Cetirizine", "Loratadine", "Fexofenadine", "Levocetirizine", "Montelukast",
+    "Salbutamol", "Albuterol", "Formoterol", "Salmeterol", "Tiotropium",
+    "Budesonide", "Beclomethasone", "Fluticasone", "Ipratropium",
+    "Theophylline", "Dextromethorphan", "Guaifenesin", "Bromhexine",
+
+    "Diazepam", "Alprazolam", "Clonazepam", "Lorazepam", "Nitrazepam",
+    "Zolpidem", "Escitalopram", "Sertraline", "Fluoxetine", "Paroxetine",
+    "Duloxetine", "Venlafaxine", "Amitriptyline", "Nortriptyline", "Imipramine",
+    "Haloperidol", "Risperidone", "Olanzapine", "Quetiapine", "Aripiprazole",
+    "Lithium", "Valproate", "Carbamazepine", "Phenytoin", "Levetiracetam",
+    "Gabapentin", "Pregabalin",
+
+    "Levothyroxine", "Thyroxine", "Methimazole", "Carbimazole", "Propylthiouracil",
+    "Hydrocortisone", "Prednisolone", "Dexamethasone", "Methylprednisolone",
+    "Betamethasone", "Triamcinolone",
+
+    "Iron Tablets", "Ferrous Sulfate", "Ferrous Gluconate", "Folic Acid",
+    "Vitamin B12", "Cyanocobalamin", "Vitamin D3", "Cholecalciferol",
+    "Calcium Carbonate", "Calcium Citrate", "Zinc Sulfate", "Vitamin C",
+    "Ascorbic Acid", "Multivitamin",
+
+    "Diclofenac", "Naproxen", "Indomethacin", "Piroxicam", "Meloxicam",
+    "Celecoxib", "Etoricoxib", "Tramadol", "Codeine", "Morphine",
+    "Oxycodone", "Buprenorphine", "Fentanyl",
+
+    "Hydroxychloroquine", "Chloroquine", "Artemether-Lumefantrine",
+    "Albendazole", "Mebendazole", "Ivermectin", "Praziquantel",
+    "Fluconazole", "Itraconazole", "Ketoconazole", "Clotrimazole",
+    "Acyclovir", "Valacyclovir", "Oseltamivir",
+
+    "Tamsulosin", "Finasteride", "Sildenafil", "Tadalafil",
+    "Clomiphene", "Progesterone", "Estradiol", "Combined Oral Contraceptive",
+    "Oxytocin", "Misoprostol"
+  ]
+}

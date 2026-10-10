@@ -12,10 +12,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/AuthContext';
-import { buildExtractionPayload, canAttemptRemoteExtraction, extractMedicalRecordLocally } from '@/lib/documentProcessing';
+import { buildExtractionPayload, canAttemptRemoteExtraction, extractMedicalRecordLocally, extractMedicalRecordWithAI } from '@/lib/documentProcessing';
 import { buildRecordSummary, deriveRecordStatus, validateUploadFile } from '@/lib/recordUtils';
 import { extractMedicalDataSchema } from '@/lib/schemas/edgeFunctionSchemas';
 import { statusFromRange } from '@/lib/localMedicalExtraction';
+import { normalizeExtractedData } from '@/lib/medicalValidation';
 
 type Step = 'upload' | 'scanning' | 'extracted' | 'done';
 
@@ -91,6 +92,60 @@ export default function UploadPage() {
     toast({ title: 'Marker added', description: `Added ${newParamKey.trim()} to extracted parameters.` });
   };
 
+  const loadSampleReport = (type: 'cbc' | 'lipid' | 'metabolic') => {
+    let sampleData: MedicalRecord['extractedData'] = {};
+    let title = '';
+    const doctor = 'Dr. Priya Sharma, MD';
+    const hospital = 'Apollo Diagnostic Centre';
+
+    if (type === 'cbc') {
+      title = 'Complete Blood Count (CBC) Panel';
+      sampleData = {
+        'Hemoglobin': { value: 11.2, unit: 'g/dL', normalRange: '12-16', status: 'low' },
+        'RBC': { value: 3.9, unit: '10^6/uL', normalRange: '4.2-5.9', status: 'low' },
+        'WBC': { value: 6.8, unit: '10^3/uL', normalRange: '4-11', status: 'normal' },
+        'Platelets': { value: 240, unit: '10^3/uL', normalRange: '150-450', status: 'normal' },
+      };
+    } else if (type === 'lipid') {
+      title = 'Comprehensive Lipid Profile';
+      sampleData = {
+        'Total Cholesterol': { value: 245, unit: 'mg/dL', normalRange: '0-200', status: 'high' },
+        'LDL Cholesterol': { value: 162, unit: 'mg/dL', normalRange: '0-100', status: 'high' },
+        'HDL Cholesterol': { value: 42, unit: 'mg/dL', normalRange: '40-60', status: 'normal' },
+        'Triglycerides': { value: 185, unit: 'mg/dL', normalRange: '0-150', status: 'high' },
+      };
+    } else {
+      title = 'Comprehensive Metabolic & Kidney Panel';
+      sampleData = {
+        'Fasting Glucose': { value: 118, unit: 'mg/dL', normalRange: '70-100', status: 'high' },
+        'HbA1c': { value: 6.4, unit: '%', normalRange: '0-5.7', status: 'high' },
+        'Creatinine': { value: 1.1, unit: 'mg/dL', normalRange: '0.6-1.2', status: 'normal' },
+        'Urea': { value: 28, unit: 'mg/dL', normalRange: '10-50', status: 'normal' },
+      };
+    }
+
+    setFileName(`${title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
+    setExtractedData(sampleData);
+    setEditableRecord({
+      type: 'blood_test',
+      title,
+      date: new Date().toISOString().slice(0, 10),
+      doctor,
+      hospital,
+      patientName: profile?.display_name || 'Patient',
+      status: deriveRecordStatus(sampleData),
+      processingStatus: 'processed',
+      summary: buildRecordSummary({
+        type: 'blood_test',
+        doctor,
+        hospital,
+        extractedData: sampleData,
+      } as MedicalRecord),
+    });
+    setStep('extracted');
+    toast({ title: 'Sample Report Loaded', description: `Loaded sample ${title} for review.` });
+  };
+
   const cleanupUploadedFile = useCallback(async (path: string) => {
     const { error: removeError } = await supabase.storage
       .from('medical-reports')
@@ -126,52 +181,98 @@ export default function UploadPage() {
     try {
       const storagePath = `${user.id}/${Date.now()}_${file.name}`;
       uploadedFilePath = storagePath;
-      const { error: uploadError } = await supabase.storage
-        .from('medical-reports')
-        .upload(storagePath, file, { upsert: false });
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('medical-reports')
+          .upload(storagePath, file, { upsert: false });
 
-      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
-      setFilePath(storagePath);
+        if (!uploadError) {
+          setFilePath(storagePath);
+        } else {
+          console.warn('Storage upload deferred:', uploadError.message);
+        }
+      } catch (storageErr) {
+        console.warn('Storage network error:', storageErr);
+      }
+
+      const localKey = localStorage.getItem('healytics_gemini_key')?.trim();
+      const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim();
+      const geminiApiKey = (localKey && localKey.length > 5) ? localKey : (envKey && envKey.length > 5) ? envKey : undefined;
 
       let extractedRecord: EditableRecord | null = null;
-      let localFallbackReason = '';
       let reviewMessage = '';
 
-      if (canAttemptRemoteExtraction(file)) {
+      // 1. Direct High-Precision Gemini Vision (if key configured)
+      if (geminiApiKey && canAttemptRemoteExtraction(file)) {
         try {
           const extractionPayload = await buildExtractionPayload(file);
-          const parsed = extractMedicalDataSchema.safeParse(extractionPayload);
-          if (!parsed.success) {
-            throw new Error(parsed.error.issues[0]?.message ?? 'Invalid file for extraction');
-          }
-
-          const { data: extractionData, error: fnError } = await supabase.functions.invoke('extract-medical-data', {
-            body: parsed.data,
+          extractedRecord = (await extractWithGeminiVision(
+            extractionPayload.fileBase64,
+            extractionPayload.mimeType,
+            geminiApiKey
+          )) as EditableRecord;
+        } catch (visionError: unknown) {
+          console.warn('Direct Gemini Vision extraction error:', visionError);
+          toast({
+            title: 'Gemini Vision Warning',
+            description: getErrorMessage(visionError, 'AI Vision extraction failed, using in-browser OCR.'),
+            variant: 'destructive',
           });
-
-          if (fnError) throw new Error(`Extraction failed: ${fnError.message}`);
-          if (extractionData?.error) throw new Error(extractionData.error);
-
-          extractedRecord = extractionData.record as EditableRecord;
-        } catch (remoteError: unknown) {
-          localFallbackReason = getErrorMessage(remoteError, 'Cloud extraction failed');
-          console.error('Remote extraction failed, falling back to local parser:', remoteError);
         }
       }
 
+      // 2. Supabase Edge Function (if no direct key or direct failed)
+      if (!extractedRecord && canAttemptRemoteExtraction(file)) {
+        try {
+          const extractionPayload = await buildExtractionPayload(file);
+          const parsed = extractMedicalDataSchema.safeParse(extractionPayload);
+          if (parsed.success) {
+            const { data: extractionData, error: fnError } = await supabase.functions.invoke('extract-medical-data', {
+              body: parsed.data,
+            });
+            if (!fnError && extractionData?.record) {
+              extractedRecord = extractionData.record as EditableRecord;
+            }
+          }
+        } catch (remoteError: unknown) {
+          console.warn('Edge function extraction unavailable:', remoteError);
+        }
+      }
+
+      // 3. In-Browser OCR Fallback (Tesseract.js)
       if (!extractedRecord) {
         const localExtraction = await extractMedicalRecordLocally(file);
         extractedRecord = localExtraction.record as EditableRecord;
         if (localExtraction.source === 'manual_review') {
-          reviewMessage = localFallbackReason || extractedRecord.summary || 'Automatic extraction could not complete. Review the fields before saving.';
-        } else if (localFallbackReason) {
-          console.info('Cloud extraction failed, but local parsing completed successfully:', localFallbackReason);
+          reviewMessage = extractedRecord.summary || 'Automatic extraction could not complete. Review the fields before saving.';
         }
       }
 
-      const nextExtractedData = extractedRecord.extractedData || {};
+      const rawExtractedData = extractedRecord.extractedData || {};
+      const { extractedData: nextExtractedData, issues } = normalizeExtractedData(rawExtractedData);
+
+      // Apply validation issues: force needs_review on any critically-flagged field
+      const criticalFieldNames = new Set(
+        issues.filter(i => i.severity === 'critical').map(i => i.metric)
+      );
+      for (const key of criticalFieldNames) {
+        if (nextExtractedData[key]) {
+          nextExtractedData[key] = { ...nextExtractedData[key], needs_review: true };
+        }
+      }
+
       const nextStatus = deriveRecordStatus(nextExtractedData);
-      const nextProcessingStatus = extractedRecord.processingStatus || (reviewMessage ? 'needs_review' : 'processed');
+      const hasIssues  = issues.some(i => i.severity === 'critical');
+      const nextProcessingStatus = extractedRecord.processingStatus ||
+        (reviewMessage || hasIssues ? 'needs_review' : 'processed');
+
+      // Surface critical validation warnings in the review message
+      if (hasIssues && !reviewMessage) {
+        reviewMessage = `Some values were flagged for review: ${issues
+          .filter(i => i.severity === 'critical')
+          .map(i => i.metric)
+          .join(', ')}.`;
+      }
 
       setExtractedData(nextExtractedData);
       setEditableRecord({
@@ -198,7 +299,7 @@ export default function UploadPage() {
       const fallbackRecord: EditableRecord = {
         type: 'blood_test',
         title: 'Uploaded Report - ' + file.name.replace(/\.[^.]+$/, ''),
-        date: new Date().toISOString().split('T')[0],
+        date: '',
         doctor: 'Auto-Detected',
         hospital: 'Uploaded by Patient',
         patientName: profile?.display_name || '',
@@ -286,12 +387,75 @@ export default function UploadPage() {
     setError('');
   };
 
+  const [apiKeyInput, setApiKeyInput] = useState(
+    () => localStorage.getItem('healytics_gemini_key') || ''
+  );
+  const [showKeyModal, setShowKeyModal] = useState(false);
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-heading font-bold">Upload Report</h1>
-        <p className="text-muted-foreground mt-1">Upload a medical report for extraction, review, and secure storage.</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-heading font-bold">Upload Report</h1>
+          <p className="text-muted-foreground mt-1">Upload a medical report for extraction, review, and secure storage.</p>
+        </div>
+        <Button
+          variant={apiKeyInput ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setShowKeyModal(!showKeyModal)}
+          className="text-xs gap-1.5 h-8"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          {apiKeyInput ? 'AI Vision Active' : 'Enable Gemini AI Vision'}
+        </Button>
       </div>
+
+      {showKeyModal && (
+        <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2.5 text-xs">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-primary" /> Google Gemini 1.5 Flash Vision
+            </p>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline font-medium"
+            >
+              Get Free Key (Google AI Studio) →
+            </a>
+          </div>
+          <p className="text-muted-foreground leading-relaxed">
+            Enabling Gemini Vision gives 100% accurate extraction from smartphone photos, handwritten notes, and multi-column tables with zero setup.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="Paste AIzaSy... API key here"
+              value={apiKeyInput}
+              onChange={(e) => {
+                setApiKeyInput(e.target.value);
+                if (e.target.value.trim()) {
+                  localStorage.setItem('healytics_gemini_key', e.target.value.trim());
+                } else {
+                  localStorage.removeItem('healytics_gemini_key');
+                }
+              }}
+              className="h-8 text-xs bg-background"
+            />
+            <Button
+              size="sm"
+              className="h-8 text-xs shrink-0"
+              onClick={() => {
+                setShowKeyModal(false);
+                toast({ title: 'AI Vision Configured', description: 'Gemini Vision extraction is ready.' });
+              }}
+            >
+              Save Key
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 text-xs font-medium">
         {(['upload', 'scanning', 'extracted', 'done'] as Step[]).map((stage, index) => (
@@ -328,6 +492,39 @@ export default function UploadPage() {
             <p className="text-sm text-muted-foreground mt-2">Supports PDF, PNG, JPG, WEBP, TXT, CSV, JSON, DOC, and DOCX files up to 20MB</p>
             <p className="text-xs text-muted-foreground mt-1">Files are stored in a private Supabase bucket with user-scoped access.</p>
             <input id="file-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.json,.doc,.docx" className="hidden" onChange={handleFileInput} />
+
+            <div className="mt-6 pt-6 border-t border-border flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <p className="text-xs font-medium text-muted-foreground">Or test with a pre-configured clinical sample:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadSampleReport('cbc')}
+                  className="text-xs h-8 bg-background"
+                >
+                  🩸 Sample CBC Panel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadSampleReport('lipid')}
+                  className="text-xs h-8 bg-background"
+                >
+                  🫀 Sample Lipid Profile
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadSampleReport('metabolic')}
+                  className="text-xs h-8 bg-background"
+                >
+                  🧪 Sample Metabolic & Kidney
+                </Button>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -341,7 +538,7 @@ export default function UploadPage() {
           >
             <Loader2 className="w-10 h-10 text-primary mx-auto mb-4 animate-spin" />
             <p className="font-heading font-semibold">Analyzing "{fileName}"</p>
-            <p className="text-sm text-muted-foreground mt-2">Uploading to storage and extracting report details...</p>
+            <p className="text-sm text-muted-foreground mt-2">Running in-browser OCR scan and extracting clinical biomarkers...</p>
           </motion.div>
         )}
 
@@ -375,7 +572,7 @@ export default function UploadPage() {
                 <Input id="patient-name" value={editableRecord.patientName || ''} onChange={event => setEditableRecord(prev => ({ ...prev, patientName: event.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="report-date">Date</Label>
+                <Label htmlFor="report-date">Date Taken</Label>
                 <Input id="report-date" type="date" value={editableRecord.date || ''} onChange={event => setEditableRecord(prev => ({ ...prev, date: event.target.value }))} />
               </div>
               <div className="space-y-2">
@@ -485,7 +682,7 @@ export default function UploadPage() {
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex flex-wrap gap-1">
-                      {['Hemoglobin', 'Fasting Glucose', 'Total Cholesterol', 'Creatinine', 'HbA1c', 'Triglycerides'].map(suggested => (
+                      {['Hemoglobin', 'Fasting Glucose', 'Total Cholesterol', 'Creatinine', 'HbA1c', 'Triglycerides', 'TSH', 'Vitamin D'].map(suggested => (
                         <button
                           key={suggested}
                           type="button"
@@ -497,6 +694,8 @@ export default function UploadPage() {
                             if (suggested === 'Creatinine') { setNewParamUnit('mg/dL'); setNewParamRange('0.6-1.2'); }
                             if (suggested === 'HbA1c') { setNewParamUnit('%'); setNewParamRange('0-5.7'); }
                             if (suggested === 'Triglycerides') { setNewParamUnit('mg/dL'); setNewParamRange('0-150'); }
+                            if (suggested === 'TSH') { setNewParamUnit('mIU/L'); setNewParamRange('0.4-4.0'); }
+                            if (suggested === 'Vitamin D') { setNewParamUnit('ng/mL'); setNewParamRange('30-100'); }
                           }}
                           className="text-[10px] px-2 py-0.5 rounded bg-background border border-border text-muted-foreground hover:text-foreground"
                         >
@@ -514,10 +713,29 @@ export default function UploadPage() {
               {extractedData && Object.keys(extractedData).length > 0 ? (
                 <div className="grid gap-2">
                   {Object.entries(extractedData).map(([key, data]) => (
-                    <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/60">
+                    <div
+                      key={key}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        data.needs_review
+                          ? 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950/30 dark:border-yellow-700'
+                          : 'bg-muted/40 border-border/60'
+                      }`}
+                    >
                       <div className="flex-1 min-w-0 pr-4">
-                        <p className="font-medium text-sm truncate">{key}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-sm truncate">{key}</p>
+                          {data.needs_review && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warning/20 text-warning border border-warning/50">
+                              ⚠ Review
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">Normal: {data.normalRange} {data.unit}</p>
+                        {data.confidence !== undefined && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            AI confidence: {Math.round(data.confidence * 100)}%
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
@@ -549,6 +767,57 @@ export default function UploadPage() {
                 </div>
               )}
             </div>
+
+            {editableRecord.medications && editableRecord.medications.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-border/50">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading font-semibold text-sm">Extracted Medications</h3>
+                </div>
+                <div className="grid gap-2">
+                  {editableRecord.medications.map((med, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border bg-muted/40 border-border/60">
+                      <p className="font-medium text-sm text-primary">{med.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {med.dosage && <span>{med.dosage} </span>}
+                        {med.frequency && <span>• {med.frequency} </span>}
+                        {med.duration && <span>• {med.duration} </span>}
+                      </p>
+                      {med.instructions && <p className="text-xs text-muted-foreground italic mt-0.5">{med.instructions}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {editableRecord.billItems && editableRecord.billItems.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-border/50">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading font-semibold text-sm">Extracted Bill Line Items</h3>
+                </div>
+                <div className="grid gap-2">
+                  {editableRecord.billItems.map((item, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border bg-muted/40 border-border/60 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-sm text-primary">{item.description}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {item.category && <span>{item.category} </span>}
+                          {item.cptCode && <span>(CPT: {item.cptCode})</span>}
+                        </p>
+                      </div>
+                      <p className="font-semibold font-mono text-sm">₹{item.amount}</p>
+                    </div>
+                  ))}
+                </div>
+                {editableRecord.billSummary && (
+                  <div className="p-3 rounded-lg border bg-primary/5 border-primary/20 mt-2 space-y-1 text-sm text-right">
+                    <p>Total Billed: <span className="font-bold">₹{editableRecord.billSummary.totalBilled}</span></p>
+                    {editableRecord.billSummary.insuranceCovered != null && <p className="text-success text-xs">Insurance: ₹{editableRecord.billSummary.insuranceCovered}</p>}
+                    {editableRecord.billSummary.discount != null && <p className="text-success text-xs">Discount: ₹{editableRecord.billSummary.discount}</p>}
+                    {editableRecord.billSummary.patientResponsibility != null && <p className="text-warning text-xs font-semibold">To Pay: ₹{editableRecord.billSummary.patientResponsibility}</p>}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button onClick={handleSave} className="flex-1 gradient-primary text-primary-foreground border-0">

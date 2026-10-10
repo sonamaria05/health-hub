@@ -3,7 +3,7 @@ import { getErrorMessage } from '@/lib/errorUtils';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, Upload, FolderOpen, TrendingUp, Brain, Menu, LogOut, Settings, MailWarning, Stethoscope,
+  LayoutDashboard, Upload, FolderOpen, TrendingUp, Brain, Menu, LogOut, Settings, MailWarning, Stethoscope, DollarSign
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useMotionPreset } from '@/lib/motion';
@@ -11,6 +11,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
+
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const primaryNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -23,6 +25,7 @@ const primaryNavItems = [
 // sheet (bottom bar only has room for 4 primary items + More).
 const secondaryNavItems = [
   { to: '/predictions', icon: Brain, label: 'Insights' },
+  { to: '/billing', icon: DollarSign, label: 'Financials' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -65,9 +68,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card p-6 gap-2 fixed h-full z-30">
-        <div className="flex items-center gap-2 mb-8">
-          <img src="/favicon.svg" alt="Healytics logo" className="w-9 h-9 rounded-lg" />
-          <h1 className="font-heading text-xl font-bold gradient-text">Healytics</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <img src="/icon.png" alt="Healytics logo" className="w-9 h-9 rounded-lg" />
+            <h1 className="font-heading text-xl font-bold gradient-text">Healytics</h1>
+          </div>
+          <ThemeToggle />
         </div>
         <nav className="flex flex-col gap-1 flex-1">
           {desktopNavItems.map(item => (
@@ -107,12 +113,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/favicon.svg" alt="Healytics logo" className="w-8 h-8 rounded-lg" />
+          <img src="/icon.png" alt="Healytics logo" className="w-8 h-8 rounded-lg" />
           <span className="font-heading font-bold gradient-text">Healytics</span>
         </div>
-        <Avatar className="w-8 h-8">
-          <AvatarFallback className="text-xs bg-primary/10 text-primary">{initials}</AvatarFallback>
-        </Avatar>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Avatar className="w-8 h-8">
+            <AvatarFallback className="text-xs bg-primary/10 text-primary">{initials}</AvatarFallback>
+          </Avatar>
+        </div>
       </div>
 
       {/* Mobile bottom tab bar: thumb-reachable primary nav, with a "More"
